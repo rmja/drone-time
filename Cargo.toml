@@ -1,0 +1,25 @@
+cargo-features = ["resolver"]
+
+[package]
+name = "drone-time"
+version = "0.1.0"
+authors = ["Rasmus Melchior Jacobsen <rmja@laesoe.org>"]
+edition = "2018"
+resolver = "2"
+repository = "https://github.com/rmja/drone-time"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+description = """
+Uptime and DateTime for Drone OS.
+"""
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[features]
+default = ["systick"]
+systick = ["drone-cortexm"]
+
+[dependencies]
+drone-core = { version = "0.13.0", path = "../drone-core" }
+drone-cortexm = { version = "0.13.0", path = "../drone-cortexm", optional = true }
