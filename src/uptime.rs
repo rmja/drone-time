@@ -55,7 +55,7 @@ impl<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> Uptime<Clock, Timer, A> {
                 .store(self.timer.counter(), Ordering::SeqCst);
         }
 
-        let increment = overflow_increment::<Timer, A>();
+        let increment = Timer::counter_max() as u64 + 1;
         let mut now = self.overflows.load(Ordering::SeqCst) as u64 * increment;
         now += self.last_counter.load(Ordering::SeqCst) as u64;
 
@@ -65,8 +65,4 @@ impl<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> Uptime<Clock, Timer, A> {
     pub fn last_counter(&self) -> u32 {
         self.last_counter.load(Ordering::SeqCst)
     }
-}
-
-fn overflow_increment<Timer: JiffiesTimer<A>, A>() -> u64 {
-    Timer::counter_max() as u64 + 1
 }
