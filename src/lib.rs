@@ -10,7 +10,7 @@ mod timespan;
 mod uptime;
 
 pub use self::{
-    adapters::jiffies::{CountDown, CountUp, JiffiesTimer, JiffiesClock},
+    adapters::jiffies::{JiffiesTimer, JiffiesClock},
     timespan::TimeSpan,
     uptime::Uptime,
 };

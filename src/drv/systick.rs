@@ -1,15 +1,17 @@
-use crate::{CountDown, JiffiesTimer};
+use crate::JiffiesTimer;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
 struct Adapter;
 
-impl JiffiesTimer<CountDown, Adapter> for SysTickPeriph {
+impl JiffiesTimer<Adapter> for SysTickPeriph {
     fn counter(&self) -> u32 {
-        self.stk_val.load_bits() as u32
+        // SysTick counts down, but the returned counter value must count up.
+        0xFF_FF_FF - self.stk_val.load_bits() as u32
     }
 
     fn counter_max() -> u32 {
-        0xFF_FF_FF // SysTick is a 24 bit counter
+        // SysTick is a 24 bit counter.
+        0xFF_FF_FF
     }
 
     fn try_clear_pending_overflow(&self) -> bool {

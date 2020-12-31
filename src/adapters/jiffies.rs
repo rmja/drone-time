@@ -1,13 +1,10 @@
-pub struct CountUp;
-pub struct CountDown;
-
 pub trait JiffiesClock {
     fn freq() -> u32;
 }
 
-pub trait JiffiesTimer<Direction, A> {
+pub trait JiffiesTimer<A> {
     /// Get the current counter value of the timer.
-    /// The value must be in the interval 0 <= counter <= max().
+    /// The value must be monotonically increasing in the interval 0 <= counter <= counter_max().
     fn counter(&self) -> u32;
 
     /// Get the maximum counter value.

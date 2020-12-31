@@ -7,18 +7,17 @@ use drone_core::{fib, thr::ThrToken, thr::prelude::*};
 
 use crate::{JiffiesClock, JiffiesTimer, TimeSpan};
 
-pub struct Uptime<Clock: JiffiesClock, Timer: JiffiesTimer<Direction, A>, Direction, A> {
+pub struct Uptime<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> {
     clock: PhantomData<Clock>,
     timer: Timer,
     /// The number of timer overflow interrupts that have occured.
     overflows: Arc<AtomicU32>,
     /// The last seen counter value.
     last_counter: AtomicU32,
-    direction: PhantomData<Direction>,
     adapter: PhantomData<A>,
 }
 
-impl<Clock: JiffiesClock, Timer: JiffiesTimer<Direction, A>, Direction, A> Uptime<Clock, Timer, Direction, A> {
+impl<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> Uptime<Clock, Timer, A> {
     pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Self {
         let counter_now = timer.counter();
 
@@ -27,7 +26,6 @@ impl<Clock: JiffiesClock, Timer: JiffiesTimer<Direction, A>, Direction, A> Uptim
             timer,
             overflows: Arc::new(AtomicU32::new(0)),
             last_counter: AtomicU32::new(counter_now),
-            direction: PhantomData,
             adapter: PhantomData,
         };
 
@@ -57,7 +55,7 @@ impl<Clock: JiffiesClock, Timer: JiffiesTimer<Direction, A>, Direction, A> Uptim
                 .store(self.timer.counter(), Ordering::SeqCst);
         }
 
-        let increment = overflow_increment::<Timer, Direction, A>();
+        let increment = overflow_increment::<Timer, A>();
         let mut now = self.overflows.load(Ordering::SeqCst) as u64 * increment;
         now += self.last_counter.load(Ordering::SeqCst) as u64;
 
@@ -69,6 +67,6 @@ impl<Clock: JiffiesClock, Timer: JiffiesTimer<Direction, A>, Direction, A> Uptim
     }
 }
 
-fn overflow_increment<Timer: JiffiesTimer<Direction, A>, Direction, A>() -> u64 {
+fn overflow_increment<Timer: JiffiesTimer<A>, A>() -> u64 {
     Timer::counter_max() as u64 + 1
 }
