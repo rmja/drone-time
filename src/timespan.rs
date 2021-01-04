@@ -15,7 +15,7 @@ pub struct TimeSpanParts {
 impl<Clock: JiffiesClock> TimeSpan<Clock> {
     pub fn parts(&self) -> TimeSpanParts {
         let mut jiffies = self.0;
-        
+
         let days = jiffies / TimeSpan::<Clock>::jiffies_per_day();
         jiffies -= days * TimeSpan::<Clock>::jiffies_per_day();
 

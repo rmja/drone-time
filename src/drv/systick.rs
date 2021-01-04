@@ -14,21 +14,11 @@ impl JiffiesTimer<Adapter> for SysTickPeriph {
         0xFF_FF_FF
     }
 
-    fn try_clear_pending_overflow(&self) -> bool {
-        // Disable overflow interrupt.
-        self.stk_ctrl.tickint.clear_bit();
+    fn has_pending_overflow(&self) -> bool {
+        self.scb_icsr_pendstset.read_bit()
+    }
 
-        let is_pending = self.scb_icsr_pendstset.read_bit();
-        if is_pending {
-            // Only clear flag if interrupt was pending.
-
-            // TODO: ACTUALLY CLEAR FLAG
-            // self.scb_icsr_pendstclr.set_bit();
-        }
-
-        // Re-enable overflow interrupt.
-        self.stk_ctrl.tickint.set_bit();
-
-        is_pending
+    fn clear_pending_overflow(&self) {
+        // self.scb_icsr_pendstclr.set_bit();
     }
 }

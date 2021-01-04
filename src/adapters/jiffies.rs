@@ -10,6 +10,6 @@ pub trait JiffiesTimer<A> {
     /// Get the maximum counter value.
     fn counter_max() -> u32;
 
-    /// Try and clear pending overflow flag in an atomic operation; return true if flag actually cleared.
-    fn try_clear_pending_overflow(&self) -> bool;
+    fn has_pending_overflow(&self) -> bool;
+    fn clear_pending_overflow(&self);
 }
