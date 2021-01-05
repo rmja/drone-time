@@ -40,7 +40,7 @@ impl JiffiesTimer<SysTickDrv> for SysTickDrv {
         // Any interrupts that fires here and calls `is_pending_overflow()` will read `false` as COUNTFLAG auto-resets.
 
         // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
-        self.1.compare_and_swap(false, is_pending, Ordering::Acquire)
+        self.1.compare_and_swap(false, is_pending, Ordering::Acquire) || is_pending
     }
 
     fn clear_pending_overflow(&self) {
