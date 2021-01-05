@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "uptime",
+			"path": "."
+		},
+		{
+			"name": "drone-time",
+			"path": "../.."
+		}
+	],
+	"settings": {}
+}
