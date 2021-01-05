@@ -2,6 +2,7 @@ use core::{
     marker::PhantomData,
     sync::atomic::{AtomicU32, AtomicUsize, Ordering},
 };
+use alloc::sync::Arc;
 use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{JiffiesClock, JiffiesTimer, TimeSpan};
@@ -29,10 +30,10 @@ impl<
     > Uptime<Clock, Timer, A>
 {
     /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _clock: Clock) -> Self {
+    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _clock: Clock) -> Arc<Self> {
         let counter_now = timer.counter();
 
-        let uptime = Self {
+        let uptime = Arc::new(Self {
             clock: PhantomData,
             timer,
             pending_seen: AtomicUsize::new(0),
@@ -40,16 +41,24 @@ impl<
             overflows_next: AtomicU32::new(1),
             last_counter: AtomicU32::new(counter_now),
             adapter: PhantomData,
-        };
+        });
+
+        let uptime_weak = Arc::downgrade(&uptime);
+        timer_int.add_fn(move || {
+            match uptime_weak.upgrade() {
+                Some(uptime) => {
+                    // now() must be called at least once per timer period so we register it for the overflow interrupt.
+                    uptime.now();
+                    fib::Yielded(())
+                },
+                None => {
+                    fib::Complete(())
+                }
+            }
+        });
 
         // Start the underlying timer.
         uptime.timer.start();
-
-        timer_int.add_fn(|| {
-            // now() must be called at least once per timer period
-            // uptime.now();
-            fib::Yielded::<(), !>(())
-        });
 
         uptime
     }
@@ -68,8 +77,8 @@ impl<
 
             let overflows = if self.timer.is_pending_overflow() {
                 // Get the `overflows_next` value to be assigned to `overflows`
-                let overflows = self.overflows_next.load(Ordering::Relaxed);
-                self.overflows.store(overflows, Ordering::Relaxed);
+                let overflows_next = self.overflows_next.load(Ordering::Relaxed);
+                self.overflows.store(overflows_next, Ordering::Relaxed);
 
                 self.timer.clear_pending_overflow();
 
@@ -81,15 +90,14 @@ impl<
                     self.overflows_next.fetch_add(1, Ordering::Relaxed);
                 }
 
-                overflows
+                overflows_next
             } else {
                 self.overflows.load(Ordering::Relaxed)
             };
 
             if cnt <= self.timer.counter() {
                 // There was no timer wrap while `overflows` was obtained.
-                let increment = Timer::counter_max() as u64 + 1;
-                break overflows as u64 * increment + cnt as u64;
+                break overflows as u64 * Timer::overflow_increment() + cnt as u64;
             } else {
                 // The underlying timer wrapped, retry
             }
