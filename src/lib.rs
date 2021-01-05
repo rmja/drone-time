@@ -11,6 +11,7 @@ mod uptime;
 
 pub use self::{
     adapters::jiffies::{JiffiesClock, JiffiesTimer},
+    drv::systick::SysTickDrv,
     timespan::TimeSpan,
     uptime::Uptime,
 };

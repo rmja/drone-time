@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::JiffiesClock;
 
@@ -57,5 +57,23 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
 
     fn jiffies_per_day() -> u64 {
         Clock::freq() as u64 * 86400
+    }
+}
+
+impl<Clock: JiffiesClock> Into<u64> for TimeSpan<Clock> {
+    fn into(self) -> u64 {
+        self.0
+    }
+}
+
+impl<Clock: JiffiesClock> Debug for TimeSpan<Clock> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let parts = self.parts();
+        write!(f, "{}d{}:{}:{}.{}",
+            parts.days,
+            parts.hours,
+            parts.minutes,
+            parts.seconds,
+            parts.milliseconds)
     }
 }

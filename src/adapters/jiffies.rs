@@ -3,6 +3,8 @@ pub trait JiffiesClock {
 }
 
 pub trait JiffiesTimer<A> {
+    fn start(&self);
+
     /// Get the current counter value of the timer.
     /// The value must be monotonically increasing in the interval 0 <= counter <= counter_max().
     fn counter(&self) -> u32;
@@ -10,6 +12,6 @@ pub trait JiffiesTimer<A> {
     /// Get the maximum counter value.
     fn counter_max() -> u32;
 
-    fn has_pending_overflow(&self) -> bool;
+    fn is_pending_overflow(&self) -> bool;
     fn clear_pending_overflow(&self);
 }

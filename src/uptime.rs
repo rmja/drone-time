@@ -29,7 +29,7 @@ impl<
     > Uptime<Clock, Timer, A>
 {
     /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Self {
+    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _clock: Clock) -> Self {
         let counter_now = timer.counter();
 
         let uptime = Self {
@@ -41,6 +41,9 @@ impl<
             last_counter: AtomicU32::new(counter_now),
             adapter: PhantomData,
         };
+
+        // Start the underlying timer.
+        uptime.timer.start();
 
         timer_int.add_fn(|| {
             // now() must be called at least once per timer period
@@ -63,7 +66,7 @@ impl<
         let now = loop {
             let cnt = self.timer.counter();
 
-            let overflows = if self.timer.has_pending_overflow() {
+            let overflows = if self.timer.is_pending_overflow() {
                 // Get the `overflows_next` value to be assigned to `overflows`
                 let overflows = self.overflows_next.load(Ordering::Relaxed);
                 self.overflows.store(overflows, Ordering::Relaxed);
@@ -83,7 +86,7 @@ impl<
                 self.overflows.load(Ordering::Relaxed)
             };
 
-            if cnt < self.timer.counter() {
+            if cnt <= self.timer.counter() {
                 // There was no timer wrap while `overflows` was obtained.
                 let increment = Timer::counter_max() as u64 + 1;
                 break overflows as u64 * increment + cnt as u64;
