@@ -45,7 +45,11 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
 
         let seconds = milliseconds / 1000;
         let sub_seconds = milliseconds - seconds * 1000;
-        Self(seconds * Self::jiffies_per_second() + (sub_seconds * 1000 * Self::jiffies_per_second()) / 1000, PhantomData)
+        Self(
+            seconds * Self::jiffies_per_second()
+                + (sub_seconds * 1000 * Self::jiffies_per_second()) / 1000,
+            PhantomData,
+        )
     }
 
     pub fn parts(&self) -> TimeSpanParts {
@@ -64,7 +68,8 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
         ticks -= seconds * Self::jiffies_per_second();
 
         // Round to nearest.
-        let milliseconds = (ticks * 1000 + Self::jiffies_per_second()/2) / Self::jiffies_per_second();
+        let milliseconds =
+            (ticks * 1000 + Self::jiffies_per_second() / 2) / Self::jiffies_per_second();
 
         TimeSpanParts {
             days: days as u16,
@@ -83,7 +88,8 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
         let seconds = self.total_seconds() as u64;
         let sub_seconds = self.0 - seconds * Self::jiffies_per_second();
         // Round to nearest.
-        seconds * 1000 + (sub_seconds * 1000 + Self::jiffies_per_second()/2) / Self::jiffies_per_second()
+        seconds * 1000
+            + (sub_seconds * 1000 + Self::jiffies_per_second() / 2) / Self::jiffies_per_second()
     }
 
     fn jiffies_per_second() -> u64 {
@@ -151,11 +157,14 @@ pub mod tests {
             hours: 2,
             minutes: 3,
             seconds: 4,
-            milliseconds: 5
+            milliseconds: 5,
         });
         let parts = ts.parts();
 
-        assert_eq!(1 * 86400 * 32768 + 2 * 3600 * 32768 + 3 * 60 * 32768 + 4 * 32768 + (5 * 32768) / 1000, ts.0);
+        assert_eq!(
+            1 * 86400 * 32768 + 2 * 3600 * 32768 + 3 * 60 * 32768 + 4 * 32768 + (5 * 32768) / 1000,
+            ts.0
+        );
         assert_eq!(1, parts.days);
         assert_eq!(2, parts.hours);
         assert_eq!(3, parts.minutes);
@@ -170,8 +179,9 @@ pub mod tests {
             hours: 2,
             minutes: 3,
             seconds: 4,
-            milliseconds: 5
-        }).total_seconds();
+            milliseconds: 5,
+        })
+        .total_seconds();
         assert_eq!(1 * 86400 + 2 * 3600 + 3 * 60 + 4, seconds);
     }
 
@@ -182,8 +192,12 @@ pub mod tests {
             hours: 2,
             minutes: 3,
             seconds: 4,
-            milliseconds: 5
-        }).total_milliseconds();
-        assert_eq!(1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5, milliseconds);
+            milliseconds: 5,
+        })
+        .total_milliseconds();
+        assert_eq!(
+            1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5,
+            milliseconds
+        );
     }
 }
