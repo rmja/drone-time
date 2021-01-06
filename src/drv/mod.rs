@@ -1,2 +1,5 @@
+#[cfg(feature = "stm32")]
+pub mod stm32;
+
 #[cfg(feature = "systick")]
-pub(crate) mod systick;
+pub mod systick;

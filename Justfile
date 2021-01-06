@@ -1,4 +1,4 @@
-features := 'systick'
+features := 'systick stm32'
 
 # Install dependencies
 deps:

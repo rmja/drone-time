@@ -5,13 +5,12 @@
 extern crate alloc;
 
 mod adapters;
-mod drv;
+pub mod drv;
 mod timespan;
 mod uptime;
 
 pub use self::{
     adapters::jiffies::{JiffiesClock, JiffiesTimer},
-    drv::systick::SysTickDrv,
     timespan::TimeSpan,
     uptime::Uptime,
 };

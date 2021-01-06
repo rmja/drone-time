@@ -34,8 +34,6 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
     }
 
     pub fn from_seconds(seconds: u32) -> Self {
-        assert!(seconds <= Self::MAX_SECONDS);
-
         Self(seconds as u64 * Self::jiffies_per_second(), PhantomData)
     }
 

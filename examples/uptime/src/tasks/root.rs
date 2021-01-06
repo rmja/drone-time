@@ -1,12 +1,12 @@
 //! The root task.
 
 use crate::{adapters::UptimeClock, consts, thr, thr::ThrsInit, Regs};
-use drone_core::{fib, log};
+use drone_core::log;
 use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32f4_hal::rcc::{
     periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup,
 };
-use drone_time::{SysTickDrv, TimeSpan, Uptime};
+use drone_time::{drv::systick::SysTickDrv, TimeSpan, Uptime};
 
 /// The root task handler.
 #[inline(never)]
