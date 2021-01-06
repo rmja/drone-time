@@ -55,7 +55,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
         let now_seconds = now.total_seconds();
         if now_seconds != last_seconds {
-            println!("{} ({}): {:?}", now_seconds, now.total_milliseconds(), now);
+            println!("{}: {:?}", now_seconds, now);
         }
 
         last = now;

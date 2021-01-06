@@ -47,9 +47,6 @@ impl JiffiesTimer<SysTickDrv> for SysTickDrv {
     }
 
     fn clear_pending_overflow(&self) {
-        // The flag is auto-cleared, so there is no reason to do it manually
-        // drone_cortexm::reg::field::WRwRegFieldBitAtomic::set_bit(&self.0.scb_icsr_pendstclr); // self.0.scb_icsr_pendstclr.set_bit();
-
         self.1.store(false, Ordering::Release);
     }
 }
