@@ -6,7 +6,7 @@ use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32f4_hal::rcc::{
     periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup,
 };
-use drone_time::{SysTickDrv, Uptime};
+use drone_time::{SysTickDrv, TimeSpan, Uptime};
 
 /// The root task handler.
 #[inline(never)]
@@ -46,10 +46,20 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         thr.sys_tick,
         UptimeClock,
     );
-    
+
+    let mut last = TimeSpan::ZERO;
+    let mut last_seconds = u32::MAX;
     loop {
-        println!("{:?}", uptime.now());
-        swo::flush();
+        let now = uptime.now();
+        assert!(now >= last);
+
+        let now_seconds = now.total_seconds();
+        if now_seconds != last_seconds {
+            println!("{} ({}): {:?}", now_seconds, now.total_milliseconds(), now);
+        }
+
+        last = now;
+        last_seconds = now_seconds;
     }
 
     // Enter a sleep state on ISR exit.

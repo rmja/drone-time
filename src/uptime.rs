@@ -71,11 +71,11 @@ impl<
         // * Any other thread can interrupt and maybe call now()
         // * The underlying timer runs underneath and may wrap during the invocation
 
-        // Increment the thread-recursion count, and get "our" level
-        let level = self.pending_seen.fetch_add(1, Ordering::Acquire);
-
         let now = loop {
             let cnt = self.timer.counter();
+
+            // Increment the thread-recursion count, and get "our" level
+            let level = self.pending_seen.fetch_add(1, Ordering::Acquire);
 
             let overflows = if self.timer.is_pending_overflow() {
                 // Get the `overflows_next` value to be assigned to `overflows`
@@ -89,13 +89,16 @@ impl<
                     // The flag is now cleared, and so there is a-lot of time until the pending flag is seen again,
                     // and we can safely increment the value of `overflow_next`,
                     // to be assigned to `overflows` when the next flag is detected the next time.
-                    self.overflows_next.fetch_add(1, Ordering::Relaxed);
+                    self.overflows_next.fetch_add(1, Ordering::SeqCst);
                 }
 
                 overflows_next
             } else {
                 self.overflows.load(Ordering::Relaxed)
             };
+
+            // Release level.
+            self.pending_seen.fetch_sub(1, Ordering::Release);
 
             if cnt <= self.timer.counter() {
                 // There was no timer wrap while `overflows` was obtained.
@@ -104,9 +107,6 @@ impl<
                 // The underlying timer wrapped, retry
             }
         };
-
-        // Release level.
-        self.pending_seen.fetch_sub(1, Ordering::Release);
 
         TimeSpan(now, PhantomData)
     }

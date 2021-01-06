@@ -106,6 +106,12 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
     }
 }
 
+impl<Clock: JiffiesClock> Default for TimeSpan<Clock> {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
 impl<Clock: JiffiesClock> Into<u64> for TimeSpan<Clock> {
     fn into(self) -> u64 {
         self.0
