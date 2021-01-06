@@ -30,7 +30,6 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
             + parts.minutes as u64 * Self::jiffies_per_minute()
             + parts.seconds as u64 * Self::jiffies_per_second()
             + (parts.milliseconds as u64 * Self::jiffies_per_second()) / 1000;
-
         Self(ticks, PhantomData)
     }
 
@@ -45,11 +44,9 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
 
         let seconds = milliseconds / 1000;
         let sub_seconds = milliseconds - seconds * 1000;
-        Self(
-            seconds * Self::jiffies_per_second()
-                + (sub_seconds * 1000 * Self::jiffies_per_second()) / 1000,
-            PhantomData,
-        )
+        let ticks = seconds * Self::jiffies_per_second()
+            + (sub_seconds * 1000 * Self::jiffies_per_second()) / 1000;
+        Self(ticks, PhantomData)
     }
 
     pub fn parts(&self) -> TimeSpanParts {
