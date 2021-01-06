@@ -1,9 +1,9 @@
 use crate::consts::SYSTICKCLK;
-use drone_time::JiffiesClock;
+use drone_time::UptimeTick;
 
-pub struct UptimeClock;
+pub struct SysTickUptimeTick;
 
-impl JiffiesClock for UptimeClock {
+impl UptimeTick for SysTickUptimeTick {
     fn freq() -> u32 {
         SYSTICKCLK.f()
     }

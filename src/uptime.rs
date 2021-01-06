@@ -2,10 +2,10 @@ use alloc::sync::Arc;
 use core::{marker::PhantomData, sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}};
 use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
-use crate::{JiffiesClock, JiffiesTimer, TimeSpan};
+use crate::{UptimeTick, UptimeTimer, TimeSpan};
 
-pub struct Uptime<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> {
-    clock: PhantomData<Clock>,
+pub struct Uptime<Tick: UptimeTick, Timer: UptimeTimer<A>, A> {
+    clock: PhantomData<Tick>,
     timer: Timer,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
     get_overflows_level: AtomicUsize,
@@ -19,19 +19,19 @@ pub struct Uptime<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> {
     adapter: PhantomData<A>,
 }
 
-unsafe impl<Clock: JiffiesClock, Timer: JiffiesTimer<A>, A> Sync for Uptime<Clock, Timer, A> {}
+unsafe impl<Tick: UptimeTick, Timer: UptimeTimer<A>, A> Sync for Uptime<Tick, Timer, A> {}
 
 impl<
-        Clock: JiffiesClock + 'static + Send,
-        Timer: JiffiesTimer<A> + 'static + Send,
+        Tick: UptimeTick + 'static + Send,
+        Timer: UptimeTimer<A> + 'static + Send,
         A: 'static + Send,
-    > Uptime<Clock, Timer, A>
+    > Uptime<Tick, Timer, A>
 {
     /// Start the uptime counter.
     pub fn start<TimerInt: ThrToken>(
         timer: Timer,
         timer_int: TimerInt,
-        _clock: Clock,
+        _tick: Tick,
     ) -> Arc<Self> {
         let counter_now = timer.counter();
 
@@ -65,7 +65,7 @@ impl<
     }
 
     /// Sample the uptime counter, returning the non-wrapping time since the uptime was started.
-    pub fn now(&self) -> TimeSpan<Clock> {
+    pub fn now(&self) -> TimeSpan<Tick> {
         // Two things can happen while invoking now()
         // * Any other thread can interrupt and maybe call now()
         // * The underlying timer runs underneath and may wrap during the invocation

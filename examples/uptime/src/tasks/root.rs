@@ -1,6 +1,6 @@
 //! The root task.
 
-use crate::{adapters::UptimeClock, consts, thr, thr::ThrsInit, Regs};
+use crate::{adapters::SysTickUptimeTick, consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32f4_hal::rcc::{
@@ -44,7 +44,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let uptime = Uptime::start(
         SysTickDrv::init(periph_sys_tick!(reg)),
         thr.sys_tick,
-        UptimeClock,
+        SysTickUptimeTick,
     );
 
     let mut last = TimeSpan::ZERO;
@@ -61,7 +61,4 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         last = now;
         last_seconds = now_seconds;
     }
-
-    // Enter a sleep state on ISR exit.
-    reg.scb_scr.sleeponexit.set_bit();
 }

@@ -1,8 +1,8 @@
-pub trait JiffiesClock {
+pub trait UptimeTick {
     fn freq() -> u32;
 }
 
-pub trait JiffiesTimer<A> {
+pub trait UptimeTimer<A> {
     fn start(&self);
 
     /// Get the current counter value of the timer.

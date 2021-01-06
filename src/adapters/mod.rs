@@ -1,1 +1,1 @@
-pub(crate) mod jiffies;
+pub(crate) mod uptime;

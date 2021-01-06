@@ -1,8 +1,8 @@
 use core::{fmt::Debug, marker::PhantomData};
 
-use crate::JiffiesClock;
+use crate::UptimeTick;
 
-pub struct TimeSpan<Clock: JiffiesClock>(pub u64, pub(crate) PhantomData<Clock>);
+pub struct TimeSpan<Tick: UptimeTick>(pub u64, pub(crate) PhantomData<Tick>);
 
 pub struct TimeSpanParts {
     pub days: u16,
@@ -12,7 +12,7 @@ pub struct TimeSpanParts {
     pub milliseconds: u16,
 }
 
-impl<Clock: JiffiesClock> TimeSpan<Clock> {
+impl<Tick: UptimeTick> TimeSpan<Tick> {
     pub const ZERO: Self = Self(0, PhantomData);
     const MAX_SECONDS: u32 = u32::MAX;
     const MAX_MILLISECONDS: u64 = Self::MAX_SECONDS as u64 * 1000;
@@ -88,7 +88,7 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
     }
 
     fn jiffies_per_second() -> u64 {
-        Clock::freq() as u64
+        Tick::freq() as u64
     }
 
     fn jiffies_per_minute() -> u64 {
@@ -104,31 +104,31 @@ impl<Clock: JiffiesClock> TimeSpan<Clock> {
     }
 }
 
-impl<Clock: JiffiesClock> Default for TimeSpan<Clock> {
+impl<Tick: UptimeTick> Default for TimeSpan<Tick> {
     fn default() -> Self {
         Self::ZERO
     }
 }
 
-impl<Clock: JiffiesClock> Into<u64> for TimeSpan<Clock> {
+impl<Tick: UptimeTick> Into<u64> for TimeSpan<Tick> {
     fn into(self) -> u64 {
         self.0
     }
 }
 
-impl<Clock: JiffiesClock> PartialEq for TimeSpan<Clock> {
+impl<Tick: UptimeTick> PartialEq for TimeSpan<Tick> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<Clock: JiffiesClock> PartialOrd for TimeSpan<Clock> {
+impl<Tick: UptimeTick> PartialOrd for TimeSpan<Tick> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
 
-impl<Clock: JiffiesClock> Debug for TimeSpan<Clock> {
+impl<Tick: UptimeTick> Debug for TimeSpan<Tick> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let parts = self.parts();
         write!(
@@ -143,9 +143,9 @@ impl<Clock: JiffiesClock> Debug for TimeSpan<Clock> {
 pub mod tests {
     use super::*;
 
-    struct TestClock;
+    struct TestTick;
 
-    impl JiffiesClock for TestClock {
+    impl UptimeTick for TestTick {
         fn freq() -> u32 {
             32768
         }
@@ -153,7 +153,7 @@ pub mod tests {
 
     #[test]
     fn parts() {
-        let ts = TimeSpan::<TestClock>::new(TimeSpanParts {
+        let ts = TimeSpan::<TestTick>::new(TimeSpanParts {
             days: 1,
             hours: 2,
             minutes: 3,
@@ -175,7 +175,7 @@ pub mod tests {
 
     #[test]
     fn total_seconds() {
-        let seconds = TimeSpan::<TestClock>::new(TimeSpanParts {
+        let seconds = TimeSpan::<TestTick>::new(TimeSpanParts {
             days: 1,
             hours: 2,
             minutes: 3,
@@ -188,7 +188,7 @@ pub mod tests {
 
     #[test]
     fn total_milliseconds() {
-        let milliseconds = TimeSpan::<TestClock>::new(TimeSpanParts {
+        let milliseconds = TimeSpan::<TestTick>::new(TimeSpanParts {
             days: 1,
             hours: 2,
             minutes: 3,
