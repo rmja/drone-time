@@ -19,6 +19,10 @@ maintenance = { status = "actively-developed" }
 [features]
 default = ["systick"]
 systick = ["drone-cortexm"]
+std = [
+    "drone-core/std",
+    "drone-cortexm/std",
+]
 
 [dependencies]
 drone-core = { version = "0.14.0", path = "../drone-core" }
