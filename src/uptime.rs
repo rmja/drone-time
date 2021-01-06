@@ -1,8 +1,8 @@
+use alloc::sync::Arc;
 use core::{
     marker::PhantomData,
     sync::atomic::{AtomicU32, AtomicUsize, Ordering},
 };
-use alloc::sync::Arc;
 use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{JiffiesClock, JiffiesTimer, TimeSpan};
@@ -30,7 +30,11 @@ impl<
     > Uptime<Clock, Timer, A>
 {
     /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _clock: Clock) -> Arc<Self> {
+    pub fn start<TimerInt: ThrToken>(
+        timer: Timer,
+        timer_int: TimerInt,
+        _clock: Clock,
+    ) -> Arc<Self> {
         let counter_now = timer.counter();
 
         let uptime = Arc::new(Self {
@@ -50,10 +54,8 @@ impl<
                     // now() must be called at least once per timer period so we register it for the overflow interrupt.
                     uptime.now();
                     fib::Yielded(())
-                },
-                None => {
-                    fib::Complete(())
                 }
+                None => fib::Complete(()),
             }
         });
 

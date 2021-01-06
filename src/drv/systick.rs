@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::JiffiesTimer;
-use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
+use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, processor::interrupt, reg::prelude::*};
 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
 
@@ -18,7 +18,7 @@ impl JiffiesTimer<SysTickDrv> for SysTickDrv {
 
         self.0.stk_ctrl.store(|r| {
             r.set_tickint() // Counting down to 0 triggers the SysTick interrupt
-             .set_enable() // Start the counter in a multi-shot way
+                .set_enable() // Start the counter in a multi-shot way
         });
     }
 
@@ -33,14 +33,17 @@ impl JiffiesTimer<SysTickDrv> for SysTickDrv {
     }
 
     fn is_pending_overflow(&self) -> bool {
-        // Read the COUNTFLAG value - this reads the register and returns 1 if timer counted to 0 _since last time this was read_.
-        let is_pending = self.0.stk_ctrl.countflag.read_bit();
+        interrupt::critical(|_| {
+            // SysTick is inherently racy so we need to disable interrupts while reading COUNTFLAG and storing its value.
 
-        // There is a race here!
-        // Any interrupts that fires here and calls `is_pending_overflow()` will read `false` as COUNTFLAG auto-resets.
+            // Read the COUNTFLAG value - this reads the register and returns 1 if timer counted to 0 _since last time this was read_.
+            let is_pending = self.0.stk_ctrl.countflag.read_bit();
 
-        // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
-        self.1.compare_and_swap(false, is_pending, Ordering::Acquire) || is_pending
+            // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
+            self.1
+                .compare_and_swap(false, is_pending, Ordering::Acquire)
+                || is_pending
+        })
     }
 
     fn clear_pending_overflow(&self) {
