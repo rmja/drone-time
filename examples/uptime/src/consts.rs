@@ -9,3 +9,5 @@ pub const HCLK: HClk = SYSCLK.to_hclk(1);
 pub const PCLK1: PClk1 = HCLK.to_pclk1(4);
 pub const PCLK2: PClk2 = HCLK.to_pclk2(2);
 pub const SYSTICKCLK: SysTickClk = HCLK.to_systickclk();
+
+pub const TIM2_FREQ: u32 = 1_000_000;

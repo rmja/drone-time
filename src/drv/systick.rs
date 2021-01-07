@@ -6,8 +6,8 @@ use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, processor::interrupt, 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
 
 impl SysTickDrv {
-    pub fn init(systick: SysTickPeriph) -> SysTickDrv {
-        SysTickDrv(systick, AtomicBool::new(false))
+    pub fn new(systick: SysTickPeriph) -> Self {
+        Self(systick, AtomicBool::new(false))
     }
 }
 

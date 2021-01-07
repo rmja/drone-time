@@ -1,12 +1,13 @@
 //! The root task.
 
-use crate::{adapters::SysTickUptimeTick, consts, thr, thr::ThrsInit, Regs};
+use crate::{adapters::*, consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
-use drone_stm32f4_hal::rcc::{
+use drone_stm32_map::periph::tim::periph_tim2;
+use drone_stm32f4_hal::{rcc::{
     periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup,
-};
-use drone_time::{drv::systick::SysTickDrv, TimeSpan, Uptime};
+}, tim::{GeneralTimCfg, config::*, prelude::*}};
+use drone_time::{drv::systick::SysTickDrv, drv::stm32::Stm32GeneralTimDrv, TimeSpan, Uptime};
 
 /// The root task handler.
 #[inline(never)]
@@ -19,6 +20,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     // Enable interrupts.
     thr.rcc.enable_int();
+    thr.tim_2.enable_int();
 
     // Initialize clocks.
     let rcc = Rcc::init(RccSetup::new(periph_rcc!(reg), thr.rcc));
@@ -41,10 +43,18 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     println!("Hello, world!");
 
+    // let uptime = Uptime::start(
+    //     SysTickDrv::new(periph_sys_tick!(reg)),
+    //     thr.sys_tick,
+    //     SysTickUptimeTick,
+    // );
+
+    let setup = GeneralTimSetup::new(periph_tim2!(reg), pclk1, TimFreq::Nominal(consts::TIM2_FREQ));
+    let tim2 = GeneralTimCfg::with_enabled_clock(setup);
     let uptime = Uptime::start(
-        SysTickDrv::init(periph_sys_tick!(reg)),
-        thr.sys_tick,
-        SysTickUptimeTick,
+        Stm32GeneralTimDrv::new(tim2.release()),
+        thr.tim_2,
+        Tim2UptimeTick,
     );
 
     let mut last = TimeSpan::ZERO;

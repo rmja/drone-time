@@ -29,7 +29,9 @@ thr! {
             pub sys_tick;
         };
         interrupts => {
+            // Vector table for stm32f429 is in PM0090 table 62 page 375.
             5: pub rcc;
+            28: pub tim_2;
         };
     };
 }
