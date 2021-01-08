@@ -3,7 +3,7 @@ use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::tim::{
     advanced::AdvancedTimMap,
     basic::BasicTimMap,
-    general::{GeneralTimMap, GeneralTimPeriph, TimCr1Dir, TimCr1Cms, traits::*},
+    general::{traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir},
 };
 
 pub struct Stm32GeneralTimDrv<Tim: GeneralTimMap>(GeneralTimPeriph<Tim>);
@@ -14,7 +14,9 @@ impl<Tim: GeneralTimMap> Stm32GeneralTimDrv<Tim> {
     }
 }
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms> UptimeTimer<Stm32GeneralTimDrv<Tim>> for Stm32GeneralTimDrv<Tim> {
+impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms> UptimeTimer<Stm32GeneralTimDrv<Tim>>
+    for Stm32GeneralTimDrv<Tim>
+{
     fn start(&self) {
         self.0.rcc_busenr_timen.set_bit();
 

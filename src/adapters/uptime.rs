@@ -1,8 +1,4 @@
-pub trait UptimeTick {
-    fn freq() -> u32;
-}
-
-pub trait UptimeTimer<A> {
+pub trait UptimeTimer<A>: Sync {
     fn start(&self);
 
     /// Get the current counter value of the timer.
