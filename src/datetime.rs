@@ -1,11 +1,10 @@
-use core::ops::{Add, Sub};
+use core::{fmt::Debug, ops::{Add, Sub}};
 
 use crate::{Tick, TimeSpan};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct DateTime(u32);
 
-#[derive(Debug)]
 pub struct DateTimeParts {
     pub year: u16,
     pub month: Month,
@@ -13,6 +12,12 @@ pub struct DateTimeParts {
     pub hour: u8,
     pub minute: u8,
     pub second: u8,
+}
+
+impl Debug for DateTimeParts {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}-{:02}-{:02}T{:02}:{:02}:{:02}", self.year, self.month as u8, self.day, self.hour, self.minute, self.second)
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
