@@ -41,7 +41,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
 
             // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
             self.1
-                .compare_and_swap(false, is_pending, Ordering::Acquire)
+                .compare_and_swap(false, is_pending, Ordering::AcqRel)
                 || is_pending
         })
     }

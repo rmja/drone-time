@@ -1,11 +1,14 @@
 use alloc::sync::Arc;
-use core::{marker::PhantomData, sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}};
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+};
 use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
-use crate::{UptimeTick, UptimeTimer, TimeSpan};
+use crate::{Tick, TimeSpan, UptimeTimer};
 
-pub struct Uptime<Tick: UptimeTick, Timer: UptimeTimer<A>, A> {
-    clock: PhantomData<Tick>,
+pub struct Uptime<T: Tick, Timer: UptimeTimer<A>, A> {
+    clock: PhantomData<T>,
     timer: Timer,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
     get_overflows_level: AtomicUsize,
@@ -19,20 +22,13 @@ pub struct Uptime<Tick: UptimeTick, Timer: UptimeTimer<A>, A> {
     adapter: PhantomData<A>,
 }
 
-unsafe impl<Tick: UptimeTick, Timer: UptimeTimer<A>, A> Sync for Uptime<Tick, Timer, A> {}
+unsafe impl<T: Tick, Timer: UptimeTimer<A>, A> Sync for Uptime<T, Timer, A> {}
 
-impl<
-        Tick: UptimeTick + 'static + Send,
-        Timer: UptimeTimer<A> + 'static + Send,
-        A: 'static + Send,
-    > Uptime<Tick, Timer, A>
+impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
+    Uptime<T, Timer, A>
 {
     /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(
-        timer: Timer,
-        timer_int: TimerInt,
-        _tick: Tick,
-    ) -> Arc<Self> {
+    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _tick: T) -> Arc<Self> {
         let counter_now = timer.counter();
 
         let uptime = Arc::new(Self {
@@ -65,7 +61,7 @@ impl<
     }
 
     /// Sample the uptime counter, returning the non-wrapping time since the uptime was started.
-    pub fn now(&self) -> TimeSpan<Tick> {
+    pub fn now(&self) -> TimeSpan<T> {
         // Two things can happen while invoking now()
         // * Any other thread can interrupt and maybe call now()
         // * The underlying timer runs underneath and may wrap during the invocation
@@ -103,7 +99,11 @@ impl<
             self.overflows.load(Ordering::Relaxed)
         };
 
-        if level == 0 && self.overflows_next_pending.compare_and_swap(true, false, Ordering::Acquire) {
+        if level == 0
+            && self
+                .overflows_next_pending
+                .compare_and_swap(true, false, Ordering::AcqRel)
+        {
             // We are the outer-most thread (lowest priority) that have called now() and seen the overflow flag.
             // The flag is now cleared, and so there is a-lot of time until the pending flag is seen again,
             // and we can safely increment the value of `overflow_next`,
