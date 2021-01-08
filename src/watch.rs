@@ -1,0 +1,190 @@
+use core::sync::atomic::Ordering;
+use atomic::Atomic;
+
+use crate::{DateTime, Tick, TimeSpan, Uptime, UptimeTimer};
+
+struct Adjust<T: Tick> {
+    datetime: DateTime,
+    upstamp: TimeSpan<T>,
+    valid: bool,
+}
+
+impl<T: Tick> Copy for Adjust<T> { }
+
+impl<T: Tick> Clone for Adjust<T> {
+    fn clone(&self) -> Self {
+        Self {
+            datetime: self.datetime,
+            upstamp: self.upstamp,
+            valid: self.valid
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct NotSetError;
+
+pub struct Watch<'a, T: Tick, Timer: UptimeTimer<A>, A> {
+    uptime: &'a Uptime<T, Timer, A>,
+    adjust: Atomic<Adjust<T>>,
+}
+
+impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
+    Watch<'a, T, Timer, A>
+{
+    const UNSET: Adjust<T> = Adjust {
+        datetime: DateTime::EPOCH,
+        upstamp: TimeSpan::ZERO,
+        valid: false,
+    };
+
+    pub fn new(uptime: &'a Uptime<T, Timer, A>) -> Self {
+        Self {
+            uptime,
+            adjust: Atomic::new(Self::UNSET),
+        }
+    }
+
+    pub fn set(&self, datetime: DateTime, upstamp: TimeSpan<T>) {
+        let adjust = Adjust { datetime, upstamp, valid: true };
+
+        self.adjust.store(adjust, Ordering::Release);
+    }
+
+    pub fn now(&self) -> Result<DateTime, NotSetError> {
+        self.at(self.uptime.now())
+    }
+
+    pub fn at(&self, upstamp: TimeSpan<T>) -> Result<DateTime, NotSetError> {
+        let adjust = self.adjust.load(Ordering::Acquire);
+        if adjust.valid {
+            if upstamp > adjust.upstamp {
+                // upstamp was sampled after the time was last adjusted.
+                Ok(adjust.datetime + (upstamp - adjust.upstamp))
+            } else {
+                // upstamp was sampled before the time was last adjusted.
+                Ok(adjust.datetime - (adjust.upstamp - upstamp))
+            }
+        }
+        else {
+            Err(NotSetError)
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use drone_core::{
+        fib,
+        thr::{ThrToken, Thread, ThreadLocal, PreemptedCell},
+        token::Token,
+    };
+
+    use crate::Month;
+
+    use super::*;
+
+    struct TestTick;
+    struct TestTimer;
+
+    #[derive(Clone, Copy)]
+    struct TestToken;
+    struct TestThreadLocal;
+    struct TestThread {
+        fibers: fib::Chain,
+        local: TestThreadLocal,
+    }
+    const TEST_THREAD: TestThread = TestThread {
+        fibers: fib::Chain::new(),
+        local: TestThreadLocal,
+    };
+
+    impl Tick for TestTick {
+        fn freq() -> u32 {
+            32768
+        }
+    }
+
+    impl UptimeTimer<TestTick> for TestTimer {
+        fn start(&self) {}
+
+        fn counter(&self) -> u32 {
+            0
+        }
+
+        fn counter_max() -> u32 {
+            0xFFFF
+        }
+
+        fn is_pending_overflow(&self) -> bool {
+            false
+        }
+
+        fn clear_pending_overflow(&self) {
+            unreachable!();
+        }
+    }
+
+    unsafe impl Token for TestToken {
+        unsafe fn take() -> Self {
+            todo!()
+        }
+    }
+
+    unsafe impl ThrToken for TestToken {
+        type Thr = TestThread;
+
+        const THR_IDX: usize = 0;
+    }
+
+    impl Thread for TestThread {
+        type Local = TestThreadLocal;
+
+        fn first() -> *const Self {
+            &TEST_THREAD
+        }
+
+        fn fib_chain(&self) -> &fib::Chain {
+            &self.fibers
+        }
+
+        unsafe fn local(&self) -> &Self::Local {
+            &self.local
+        }
+    }
+
+    impl ThreadLocal for TestThreadLocal {
+        fn preempted(&self) -> &PreemptedCell {
+            todo!()
+        }
+    }
+
+    #[test]
+    fn set() {
+        let timer = TestTimer;
+        let thread = TestToken;
+        let uptime = Uptime::start(timer, thread, TestTick);
+        let watch = Watch::new(&uptime);
+
+        let now = watch.now();
+        assert!(now.is_err());
+
+        let set_datetime = DateTime::new(2021, Month::January, 8, 10, 39, 27);
+        let set_upstamp = TimeSpan::from_seconds(100);
+        watch.set(set_datetime, set_upstamp);
+
+        assert_eq!(
+            set_datetime - TimeSpan::<TestTick>::from_seconds(1),
+            watch
+                .at(set_upstamp - TimeSpan::<TestTick>::from_seconds(1))
+                .unwrap()
+        );
+        assert_eq!(set_datetime, watch.at(set_upstamp).unwrap());
+        assert_eq!(
+            set_datetime + TimeSpan::<TestTick>::from_seconds(1),
+            watch
+                .at(set_upstamp + TimeSpan::<TestTick>::from_seconds(1))
+                .unwrap()
+        );
+    }
+}
