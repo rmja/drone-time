@@ -43,19 +43,19 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     println!("Hello, world!");
 
-    // let uptime = Uptime::start(
-    //     SysTickDrv::new(periph_sys_tick!(reg)),
-    //     thr.sys_tick,
-    //     SysTickUptimeTick,
-    // );
-
-    let setup = GeneralTimSetup::new(periph_tim2!(reg), pclk1, TimFreq::Nominal(consts::TIM2_FREQ));
-    let tim2 = GeneralTimCfg::with_enabled_clock(setup);
     let uptime = Uptime::start(
-        Stm32GeneralTimDrv::new(tim2.release()),
-        thr.tim_2,
-        Tim2UptimeTick,
+        SysTickDrv::new(periph_sys_tick!(reg)),
+        thr.sys_tick,
+        SysTickUptimeTick,
     );
+
+    // let setup = GeneralTimSetup::new(periph_tim2!(reg), pclk1, TimFreq::Nominal(consts::TIM2_FREQ));
+    // let tim2 = GeneralTimCfg::with_enabled_clock(setup);
+    // let uptime = Uptime::start(
+    //     Stm32GeneralTimDrv::new(tim2.release()),
+    //     thr.tim_2,
+    //     Tim2UptimeTick,
+    // );
 
     let mut last = TimeSpan::ZERO;
     let mut last_seconds = u32::MAX;

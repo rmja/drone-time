@@ -1,5 +1,5 @@
-use core::sync::atomic::Ordering;
 use atomic::Atomic;
+use core::sync::atomic::Ordering;
 
 use crate::{DateTime, Tick, TimeSpan, Uptime, UptimeTimer};
 
@@ -9,14 +9,14 @@ struct Adjust<T: Tick> {
     valid: bool,
 }
 
-impl<T: Tick> Copy for Adjust<T> { }
+impl<T: Tick> Copy for Adjust<T> {}
 
 impl<T: Tick> Clone for Adjust<T> {
     fn clone(&self) -> Self {
         Self {
             datetime: self.datetime,
             upstamp: self.upstamp,
-            valid: self.valid
+            valid: self.valid,
         }
     }
 }
@@ -46,7 +46,11 @@ impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 's
     }
 
     pub fn set(&self, datetime: DateTime, upstamp: TimeSpan<T>) {
-        let adjust = Adjust { datetime, upstamp, valid: true };
+        let adjust = Adjust {
+            datetime,
+            upstamp,
+            valid: true,
+        };
 
         self.adjust.store(adjust, Ordering::Release);
     }
@@ -65,8 +69,7 @@ impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 's
                 // upstamp was sampled before the time was last adjusted.
                 Ok(adjust.datetime - (adjust.upstamp - upstamp))
             }
-        }
-        else {
+        } else {
             Err(NotSetError)
         }
     }
@@ -76,7 +79,7 @@ impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 's
 pub mod tests {
     use drone_core::{
         fib,
-        thr::{ThrToken, Thread, ThreadLocal, PreemptedCell},
+        thr::{PreemptedCell, ThrToken, Thread, ThreadLocal},
         token::Token,
     };
 

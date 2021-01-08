@@ -1,3 +1,4 @@
+#![feature(asm)]
 #![feature(never_type)]
 #![feature(prelude_import)]
 #![cfg_attr(not(feature = "std"), no_std)]
