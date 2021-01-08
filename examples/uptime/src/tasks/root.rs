@@ -7,7 +7,7 @@ use drone_stm32_map::periph::tim::periph_tim2;
 use drone_stm32f4_hal::{rcc::{
     periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup,
 }, tim::{GeneralTimCfg, config::*, prelude::*}};
-use drone_time::{drv::systick::SysTickDrv, drv::stm32::Stm32GeneralTimDrv, TimeSpan, Uptime};
+use drone_time::{DateTime, TimeSpan, Uptime, Watch, drv::stm32::Stm32GeneralTimDrv, drv::systick::SysTickDrv};
 
 /// The root task handler.
 #[inline(never)]
@@ -57,6 +57,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     //     Tim2UptimeTick,
     // );
 
+    let mut watch = Watch::new(&uptime);
+
+    watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
+
     let mut last = TimeSpan::ZERO;
     let mut last_seconds = u32::MAX;
     loop {
@@ -65,7 +69,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
         let now_seconds = now.total_seconds();
         if now_seconds != last_seconds {
-            println!("{}: {:?}", now_seconds, now);
+            println!("{:?}: {:?}", now, watch.at(now).unwrap().parts());
         }
 
         last = now;

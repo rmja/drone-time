@@ -85,7 +85,7 @@ impl DateTime {
     }
 
     /// Get the date part without the time component.
-    pub fn date(&self) -> Self {
+    pub const fn date(&self) -> Self {
         Self((self.0 / SECONDS_PER_DAY) * SECONDS_PER_DAY)
     }
 
@@ -174,7 +174,7 @@ fn days_in_month(year: u16, month: Month) -> u8 {
     }
 }
 
-fn days_in_year(year: u16) -> u16 {
+const fn days_in_year(year: u16) -> u16 {
     if is_leap_year(year) {
         366
     } else {
@@ -182,7 +182,7 @@ fn days_in_year(year: u16) -> u16 {
     }
 }
 
-fn is_leap_year(year: u16) -> bool {
+const fn is_leap_year(year: u16) -> bool {
     if year % 4 > 0 {
         false
     } else if year % 100 > 0 {

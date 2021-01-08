@@ -1,4 +1,3 @@
-use atomic::Atomic;
 use core::sync::atomic::Ordering;
 
 use crate::{DateTime, Tick, TimeSpan, Uptime, UptimeTimer};
@@ -6,19 +5,6 @@ use crate::{DateTime, Tick, TimeSpan, Uptime, UptimeTimer};
 struct Adjust<T: Tick> {
     datetime: DateTime,
     upstamp: TimeSpan<T>,
-    valid: bool,
-}
-
-impl<T: Tick> Copy for Adjust<T> {}
-
-impl<T: Tick> Clone for Adjust<T> {
-    fn clone(&self) -> Self {
-        Self {
-            datetime: self.datetime,
-            upstamp: self.upstamp,
-            valid: self.valid,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -26,33 +12,24 @@ pub struct NotSetError;
 
 pub struct Watch<'a, T: Tick, Timer: UptimeTimer<A>, A> {
     uptime: &'a Uptime<T, Timer, A>,
-    adjust: Atomic<Adjust<T>>,
+    adjust: Option<Adjust<T>>,
 }
 
 impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
     Watch<'a, T, Timer, A>
 {
-    const UNSET: Adjust<T> = Adjust {
-        datetime: DateTime::EPOCH,
-        upstamp: TimeSpan::ZERO,
-        valid: false,
-    };
-
     pub fn new(uptime: &'a Uptime<T, Timer, A>) -> Self {
         Self {
             uptime,
-            adjust: Atomic::new(Self::UNSET),
+            adjust: None,
         }
     }
 
-    pub fn set(&self, datetime: DateTime, upstamp: TimeSpan<T>) {
-        let adjust = Adjust {
+    pub fn set(&mut self, datetime: DateTime, upstamp: TimeSpan<T>) {
+        self.adjust = Some(Adjust {
             datetime,
             upstamp,
-            valid: true,
-        };
-
-        self.adjust.store(adjust, Ordering::Release);
+        });
     }
 
     pub fn now(&self) -> Result<DateTime, NotSetError> {
@@ -60,8 +37,7 @@ impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 's
     }
 
     pub fn at(&self, upstamp: TimeSpan<T>) -> Result<DateTime, NotSetError> {
-        let adjust = self.adjust.load(Ordering::Acquire);
-        if adjust.valid {
+        if let Some(adjust) = &self.adjust {
             if upstamp > adjust.upstamp {
                 // upstamp was sampled after the time was last adjusted.
                 Ok(adjust.datetime + (upstamp - adjust.upstamp))
@@ -167,7 +143,7 @@ pub mod tests {
         let timer = TestTimer;
         let thread = TestToken;
         let uptime = Uptime::start(timer, thread, TestTick);
-        let watch = Watch::new(&uptime);
+        let mut watch = Watch::new(&uptime);
 
         let now = watch.now();
         assert!(now.is_err());
