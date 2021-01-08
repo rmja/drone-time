@@ -11,6 +11,8 @@ impl SysTickDrv {
     }
 }
 
+unsafe impl Sync for SysTickDrv {}
+
 impl UptimeTimer<SysTickDrv> for SysTickDrv {
     fn start(&self) {
         // Enable timer

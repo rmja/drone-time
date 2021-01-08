@@ -14,6 +14,8 @@ impl<Tim: GeneralTimMap> Stm32GeneralTimDrv<Tim> {
     }
 }
 
+unsafe impl<Tim: GeneralTimMap> Sync for Stm32GeneralTimDrv<Tim> {}
+
 impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms> UptimeTimer<Stm32GeneralTimDrv<Tim>>
     for Stm32GeneralTimDrv<Tim>
 {
