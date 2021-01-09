@@ -18,7 +18,7 @@ maintenance = { status = "actively-developed" }
 
 [features]
 default = []
-systick-dint = ["drone-cortexm"]
+systick = ["drone-cortexm"]
 stm32 = ["drone-stm32-map"]
 std = [
     "drone-core/std",

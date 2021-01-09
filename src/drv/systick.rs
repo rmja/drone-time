@@ -39,7 +39,9 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         // _also clears the flag_. That means that any other interrupting thread cannot read flag.
 
         interrupt::critical(|_| {
-            // Read the COUNTFLAG value - this reads the register and returns 1 if timer counted to 0 _since last time this was read_.
+            // Read the COUNTFLAG value.
+            // This reads the register and returns 1 if timer counted to 0 _since last time this was read_,
+            // i.e. the flag is actually cleared by reading it.
             let is_pending = self.0.stk_ctrl.countflag.read_bit();
 
             // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
