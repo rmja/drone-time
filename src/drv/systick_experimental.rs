@@ -69,8 +69,8 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
             r0 = SYSTICK_CTRL;
         }
 
-        let is_pending = r0 & 0x10000 > 0; // Mask out the COUNTFLAG.
-        let is_pending = self.1.compare_and_swap(false, is_pending, Ordering::AcqRel) || is_pending;
+        let countflag = r0 & 0x10000 > 0; // Mask out the COUNTFLAG.
+        let is_pending = self.1.compare_and_swap(false, countflag, Ordering::AcqRel);
 
         // The flag is now safely stored.
         self.2.store(0, Ordering::Release);
