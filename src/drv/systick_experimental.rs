@@ -49,7 +49,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
             let preempted_r0 = *(preempted_sp + SP_TO_R0_OFFSET);
             if preempted_r0 == 0 {
                 // The preempted thread has not yet read SYSTICK_CTRL - its value is invalid.
-                // Steal the atomic as other interrupting threads should read
+                // Steal the stack pointer atomic as other interrupting threads should read
                 // our r0, and not the one we have just found to be invalid.
                 preempted_sp = self.2.store(my_sp);
                 r0 = SYSTICK_CTRL;
