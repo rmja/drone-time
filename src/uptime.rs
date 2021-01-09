@@ -7,7 +7,11 @@ use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{Tick, TimeSpan, UptimeTimer};
 
-pub struct Uptime<T: Tick, Timer: UptimeTimer<A>, A> {
+pub trait Uptime<T: Tick> {
+    fn now(&self) -> TimeSpan<T>;
+}
+
+pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<A>, A> {
     clock: PhantomData<T>,
     timer: Timer,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
@@ -22,10 +26,10 @@ pub struct Uptime<T: Tick, Timer: UptimeTimer<A>, A> {
     adapter: PhantomData<A>,
 }
 
-unsafe impl<T: Tick, Timer: UptimeTimer<A>, A> Sync for Uptime<T, Timer, A> {}
+unsafe impl<T: Tick, Timer: UptimeTimer<A>, A> Sync for UptimeDrv<T, Timer, A> {}
 
 impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
-    Uptime<T, Timer, A>
+    UptimeDrv<T, Timer, A>
 {
     /// Start the uptime counter.
     pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _tick: T) -> Arc<Self> {
@@ -61,7 +65,7 @@ impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'stati
     }
 
     /// Sample the uptime counter, returning the non-wrapping time since the uptime was started.
-    pub fn now(&self) -> TimeSpan<T> {
+    fn get_now(&self) -> TimeSpan<T> {
         // Two things can happen while invoking now()
         // * Any other thread can interrupt and maybe call now()
         // * The underlying timer runs underneath and may wrap during the invocation
@@ -119,5 +123,11 @@ impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'stati
 
     pub fn last_counter(&self) -> u32 {
         self.last_counter.load(Ordering::Relaxed)
+    }
+}
+
+impl<T: Tick, Timer: UptimeTimer<A>, A> Uptime<T> for UptimeDrv<T, Timer, A> {
+    fn now(&self) -> TimeSpan<T> {
+        self.get_now()
     }
 }

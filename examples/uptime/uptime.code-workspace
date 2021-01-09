@@ -7,6 +7,15 @@
 		{
 			"name": "drone-time",
 			"path": "../.."
+		},
+		{
+			"path": "../../../drone-cortexm"
+		},
+		{
+			"path": "../../../drone-stm32-map"
+		},
+		{
+			"path": "../../../drone-stm32f4-hal"
 		}
 	],
 	"settings": {}

@@ -8,6 +8,7 @@ extern crate alloc;
 mod adapters;
 mod datetime;
 pub mod drv;
+mod timer;
 mod timespan;
 mod uptime;
 mod watch;
@@ -17,7 +18,7 @@ pub use self::{
     adapters::uptime::UptimeTimer,
     datetime::{DateTime, Month},
     timespan::TimeSpan,
-    uptime::Uptime,
+    uptime::{Uptime, UptimeDrv},
     watch::Watch,
 };
 

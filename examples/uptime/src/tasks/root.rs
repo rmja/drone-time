@@ -7,7 +7,7 @@ use drone_stm32_map::periph::tim::periph_tim2;
 use drone_stm32f4_hal::{rcc::{
     periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup,
 }, tim::{GeneralTimCfg, config::*, prelude::*}};
-use drone_time::{DateTime, TimeSpan, Uptime, Watch, drv::stm32::Stm32GeneralTimDrv, drv::systick::SysTickDrv};
+use drone_time::{DateTime, TimeSpan, Uptime, UptimeDrv, Watch, drv::stm32::Stm32GeneralTimDrv, drv::systick::SysTickDrv};
 
 /// The root task handler.
 #[inline(never)]
@@ -43,7 +43,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     println!("Hello, world!");
 
-    let uptime = Uptime::start(
+    let uptime = UptimeDrv::start(
         SysTickDrv::new(periph_sys_tick!(reg)),
         thr.sys_tick,
         SysTickUptimeTick,
@@ -51,7 +51,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     // let setup = GeneralTimSetup::new(periph_tim2!(reg), pclk1, TimFreq::Nominal(consts::TIM2_FREQ));
     // let tim2 = GeneralTimCfg::with_enabled_clock(setup);
-    // let uptime = Uptime::start(
+    // let uptime = UptimeDrv::start(
     //     Stm32GeneralTimDrv::new(tim2.release()),
     //     thr.tim_2,
     //     Tim2UptimeTick,
