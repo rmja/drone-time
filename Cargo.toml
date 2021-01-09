@@ -17,8 +17,8 @@ Uptime and DateTime for Drone OS.
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["systick", "stm32"]
-systick = ["drone-cortexm"]
+default = []
+systick-dint = ["drone-cortexm"]
 stm32 = ["drone-stm32-map"]
 std = [
     "drone-core/std",
