@@ -1,13 +1,13 @@
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::UptimeTimer;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
-pub struct SysTickDrv(SysTickPeriph, AtomicBool, AtomicUsize);
+pub struct SysTickDrv(SysTickPeriph, AtomicUsize);
 
 impl SysTickDrv {
     pub fn new(systick: SysTickPeriph) -> Self {
-        Self(systick, AtomicBool::new(false), AtomicUsize::new(0))
+        Self(systick, AtomicUsize::new(0))
     }
 }
 
@@ -50,7 +50,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         let mut r0 = 0;
         let my_sp: usize; // Get this threads stack pointer.
         unsafe { asm!("mov {}, SP", out(reg) my_sp) };
-        let preempted_sp = self.2.compare_and_swap(0, my_sp, Ordering::AcqRel);
+        let preempted_sp = self.1.compare_and_swap(0, my_sp, Ordering::AcqRel);
         if preempted_sp != 0 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
@@ -60,7 +60,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
                 // Steal the stack pointer atomic from the preempted thread
                 // as other interrupting threads should read our r0,
                 // and not the one we have just found to be invalid.
-                self.2.store(my_sp, Ordering::Release);
+                self.1.compare_and_swap(preempted_sp, my_sp, Ordering::Release);
                 r0 = SYSTICK_CTRL;
             }
             else {
@@ -73,17 +73,17 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
             r0 = SYSTICK_CTRL;
         }
 
-        if self.2.compare_and_swap(my_sp, preempted_sp, Ordering::AcqRel) == 0 {
-            // The R0 value is valid
-            let countflag = r0 & 0x10000 > 0; // Mask out the COUNTFLAG.
-            self.1.compare_and_swap(false, countflag, Ordering::AcqRel)
+        if r0 & 0x10000 > 0 {
+            // COUNTFLAG is set
+            // Store the flag together with the stack pointer
+            self.1.compare_and_swap(my_sp, my_sp | 1, Ordering::AcqRel) & 1
         }
         else {
-            self.1.load(Ordering::Acquire)
+            self.1.load(Ordering::Acquire) & 1
         }
     }
 
     fn clear_pending_overflow(&self) {
-        self.1.store(false, Ordering::Release);
+        self.1.store(0, Ordering::Release);
     }
 }
