@@ -8,7 +8,7 @@ extern crate alloc;
 mod adapters;
 mod datetime;
 pub mod drv;
-mod timer;
+mod muxtimer;
 mod timespan;
 mod uptime;
 mod watch;
