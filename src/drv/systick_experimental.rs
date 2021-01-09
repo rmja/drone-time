@@ -42,7 +42,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         // Pseudo code - does not compile:
         let r0 = 0; // Set register to an impossible SYSTICK_CTRL value.
         let my_sp = SP; // Get this threads stack pointer.
-        let + = self.2.compare_and_swap(0, my_sp, Ordering::AcqRel);
+        let preempted_sp = self.2.compare_and_swap(0, my_sp, Ordering::AcqRel);
         if preempted_sp != 0 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
