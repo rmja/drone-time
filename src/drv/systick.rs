@@ -55,7 +55,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
 }
 
 mod interrupt {
-    use core::sync::atomic::{Ordering, compiler_fence};
+    use core::sync::atomic::{compiler_fence, Ordering};
 
     /// Disables all interrupts
     #[inline]
@@ -112,4 +112,4 @@ mod interrupt {
 
         r
     }
-} 
+}

@@ -1,4 +1,7 @@
-use core::{fmt::Debug, ops::{Add, Sub}};
+use core::{
+    fmt::Debug,
+    ops::{Add, Sub},
+};
 
 use crate::{Tick, TimeSpan};
 
@@ -16,7 +19,11 @@ pub struct DateTimeParts {
 
 impl Debug for DateTimeParts {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}-{:02}-{:02}T{:02}:{:02}:{:02}", self.year, self.month as u8, self.day, self.hour, self.minute, self.second)
+        write!(
+            f,
+            "{}-{:02}-{:02}T{:02}:{:02}:{:02}",
+            self.year, self.month as u8, self.day, self.hour, self.minute, self.second
+        )
     }
 }
 

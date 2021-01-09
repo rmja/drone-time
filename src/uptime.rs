@@ -7,7 +7,8 @@ use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{Tick, TimeSpan, UptimeTimer};
 
-pub trait Uptime<T: Tick> {
+pub trait Uptime<T: Tick>: Sync {
+    /// Sample the uptime counter, returning the non-wrapping time since the uptime was started.
     fn now(&self) -> TimeSpan<T>;
 }
 
@@ -28,8 +29,11 @@ pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<A>, A> {
 
 unsafe impl<T: Tick, Timer: UptimeTimer<A>, A> Sync for UptimeDrv<T, Timer, A> {}
 
-impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
-    UptimeDrv<T, Timer, A>
+impl<T, Timer, A> UptimeDrv<T, Timer, A>
+where
+    T: Tick + 'static + Send,
+    Timer: UptimeTimer<A> + 'static + Send,
+    A: 'static + Send,
 {
     /// Start the uptime counter.
     pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _tick: T) -> Arc<Self> {
@@ -62,27 +66,6 @@ impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'stati
         uptime.timer.start();
 
         uptime
-    }
-
-    /// Sample the uptime counter, returning the non-wrapping time since the uptime was started.
-    fn get_now(&self) -> TimeSpan<T> {
-        // Two things can happen while invoking now()
-        // * Any other thread can interrupt and maybe call now()
-        // * The underlying timer runs underneath and may wrap during the invocation
-
-        let now = loop {
-            let cnt1 = self.timer.counter();
-            let overflows = self.get_overflows();
-            let cnt2 = self.timer.counter();
-            if cnt1 <= cnt2 {
-                // There was no timer wrap while `overflows` was obtained.
-                break overflows as u64 * Timer::overflow_increment() + cnt2 as u64;
-            } else {
-                // The underlying timer wrapped, retry
-            }
-        };
-
-        TimeSpan(now, PhantomData)
     }
 
     fn get_overflows(&self) -> u32 {
@@ -126,8 +109,29 @@ impl<T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'stati
     }
 }
 
-impl<T: Tick, Timer: UptimeTimer<A>, A> Uptime<T> for UptimeDrv<T, Timer, A> {
+impl<T, Timer, A> Uptime<T> for UptimeDrv<T, Timer, A>
+where
+    T: Tick + 'static + Send,
+    Timer: UptimeTimer<A> + 'static + Send,
+    A: 'static + Send,
+{
     fn now(&self) -> TimeSpan<T> {
-        self.get_now()
+        // Two things can happen while invoking now()
+        // * Any other thread can interrupt and maybe call now()
+        // * The underlying timer runs underneath and may wrap during the invocation
+
+        let now = loop {
+            let cnt1 = self.timer.counter();
+            let overflows = self.get_overflows();
+            let cnt2 = self.timer.counter();
+            if cnt1 <= cnt2 {
+                // There was no timer wrap while `overflows` was obtained.
+                break overflows as u64 * Timer::overflow_increment() + cnt2 as u64;
+            } else {
+                // The underlying timer wrapped, retry
+            }
+        };
+
+        TimeSpan(now, PhantomData)
     }
 }

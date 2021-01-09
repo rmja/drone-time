@@ -1,6 +1,4 @@
-use core::sync::atomic::Ordering;
-
-use crate::{DateTime, Tick, TimeSpan, Uptime, UptimeTimer};
+use crate::{DateTime, Tick, TimeSpan, Uptime};
 
 struct Adjust<T: Tick> {
     datetime: DateTime,
@@ -10,15 +8,13 @@ struct Adjust<T: Tick> {
 #[derive(Debug)]
 pub struct NotSetError;
 
-pub struct Watch<'a, T: Tick, Timer: UptimeTimer<A>, A> {
-    uptime: &'a Uptime<T, Timer, A>,
+pub struct Watch<'a, U: Uptime<T>, T: Tick> {
+    uptime: &'a U,
     adjust: Option<Adjust<T>>,
 }
 
-impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 'static + Send>
-    Watch<'a, T, Timer, A>
-{
-    pub fn new(uptime: &'a Uptime<T, Timer, A>) -> Self {
+impl<'a, U: Uptime<T>, T: Tick> Watch<'a, U, T> {
+    pub fn new(uptime: &'a U) -> Self {
         Self {
             uptime,
             adjust: None,
@@ -26,10 +22,7 @@ impl<'a, T: Tick + 'static + Send, Timer: UptimeTimer<A> + 'static + Send, A: 's
     }
 
     pub fn set(&mut self, datetime: DateTime, upstamp: TimeSpan<T>) {
-        self.adjust = Some(Adjust {
-            datetime,
-            upstamp,
-        });
+        self.adjust = Some(Adjust { datetime, upstamp });
     }
 
     pub fn now(&self) -> Result<DateTime, NotSetError> {

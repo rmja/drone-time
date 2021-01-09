@@ -54,21 +54,24 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         if preempted_sp != 0 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
-            let preempted_r0 = unsafe { core::ptr::read_volatile((preempted_sp & 0xFFFFFFFE as *const usize).add(SP_TO_R0_OFFSET)) };
+            let preempted_r0 = unsafe {
+                core::ptr::read_volatile(
+                    ((preempted_sp & 0xFFFFFFFE) as *const usize).add(SP_TO_R0_OFFSET),
+                )
+            };
             if preempted_r0 == 0 {
                 // The preempted thread has not yet read SYSTICK_CTRL - its value is invalid.
                 // Steal the stack pointer atomic from the preempted thread
                 // as other interrupting threads should read our r0,
                 // and not the one we have just found to be invalid.
-                self.1.compare_and_swap(preempted_sp, my_sp, Ordering::Release);
+                self.1
+                    .compare_and_swap(preempted_sp, my_sp, Ordering::Release);
                 r0 = SYSTICK_CTRL;
-            }
-            else {
+            } else {
                 // The preempted thread had SYSTICK_CTRL read to R0 on its stack.
                 r0 = preempted_r0;
             }
-        }
-        else {
+        } else {
             // We have not preempted any other threads.
             r0 = SYSTICK_CTRL;
         }
@@ -76,10 +79,9 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         if r0 & 0x10000 > 0 {
             // COUNTFLAG is set
             // Store the flag together with the stack pointer
-            self.1.compare_and_swap(my_sp, my_sp | 1, Ordering::AcqRel) & 1
-        }
-        else {
-            self.1.load(Ordering::Acquire) & 1
+            self.1.compare_and_swap(my_sp, my_sp | 1, Ordering::AcqRel) & 1 > 0
+        } else {
+            self.1.load(Ordering::Acquire) & 1 > 0
         }
     }
 

@@ -57,7 +57,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     //     Tim2UptimeTick,
     // );
 
-    let mut watch = Watch::new(&uptime);
+    let mut watch = Watch::new(&*uptime);
 
     watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 
