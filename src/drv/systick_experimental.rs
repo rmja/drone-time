@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::UptimeTimer;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
-pub struct SysTickDrv(SysTickPeriph, AtomicBool);
+pub struct SysTickDrv(SysTickPeriph, AtomicBool, AtomicUsize);
 
 impl SysTickDrv {
     pub fn new(systick: SysTickPeriph) -> Self {
@@ -34,25 +34,29 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         0xFF_FF_FF
     }
 
-    [inline(never)]
+    #[inline(never)]
     fn is_pending_overflow(&self) -> bool {
         // SysTick is inherently racy as reading the COUNTFLAG that tells whether the timer has overflowed,
         // _also clears the flag_. That means that any other interrupting thread cannot read flag.
 
         // Pseudo code - does not compile:
-        let r0 = 0; // Set register to an impossible SYSTICK_CTRL value.
-        let my_sp = SP; // Get this threads stack pointer.
+        const SYSTICK_CTRL: usize = 0xE000E010;
+        const SP_TO_R0_OFFSET: usize = 2;
+        unsafe { asm!("nop") };
+        let mut r0 = 0; // Set register to an impossible SYSTICK_CTRL value.
+        let my_sp: usize; // Get this threads stack pointer.
+        unsafe { asm!("mov {}, SP", out(reg) my_sp) };
         let preempted_sp = self.2.compare_and_swap(0, my_sp, Ordering::AcqRel);
         if preempted_sp != 0 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
-            let preempted_r0 = *(preempted_sp + SP_TO_R0_OFFSET);
+            let preempted_r0 = unsafe { core::ptr::read_volatile((preempted_sp as *const usize).add(SP_TO_R0_OFFSET)) };
             if preempted_r0 == 0 {
                 // The preempted thread has not yet read SYSTICK_CTRL - its value is invalid.
                 // Steal the stack pointer atomic from the preempted thread
                 // as other interrupting threads should read our r0,
                 // and not the one we have just found to be invalid.
-                preempted_sp = self.2.store(my_sp);
+                self.2.store(my_sp, Ordering::Release);
                 r0 = SYSTICK_CTRL;
             }
             else {
@@ -69,7 +73,9 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         let is_pending = self.1.compare_and_swap(false, is_pending, Ordering::AcqRel) || is_pending;
 
         // The flag is now safely stored.
-        self.2.store(0);
+        self.2.store(0, Ordering::Release);
+
+        unsafe { asm!("nop") };
 
         is_pending
     }
@@ -78,63 +84,3 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         self.1.store(false, Ordering::Release);
     }
 }
-
-mod interrupt {
-    use core::sync::atomic::{Ordering, compiler_fence};
-
-    /// Disables all interrupts
-    #[inline]
-    pub fn disable() {
-        #[cfg(feature = "std")]
-        return unimplemented!();
-        unsafe { asm!("cpsid i") };
-        compiler_fence(Ordering::SeqCst);
-    }
-
-    /// Enables all (not masked) interrupts
-    ///
-    /// # Safety
-    ///
-    /// - Do not call this function inside a critical section.
-    #[inline]
-    pub unsafe fn enable() {
-        #[cfg(feature = "std")]
-        return unimplemented!();
-        compiler_fence(Ordering::SeqCst);
-        unsafe { asm!("cpsie i") };
-    }
-
-    #[inline]
-    fn primask() -> u32 {
-        #[cfg(feature = "std")]
-        return unimplemented!();
-        let r: usize;
-        unsafe { asm!("mrs {}, PRIMASK", out(reg) r) };
-        r as u32
-    }
-
-    /// Critical section token.
-    pub struct CriticalSection;
-
-    /// Execute the closure `f` in an interrupt-free context.
-    #[inline]
-    pub fn critical<F, R>(f: F) -> R
-    where
-        F: FnOnce(&CriticalSection) -> R,
-    {
-        let pm = primask();
-
-        // Disable interrupts - they may already be disabled if this is a nested critical section.
-        disable();
-
-        let cs = CriticalSection;
-        let r = f(&cs);
-
-        // Only enable interrupt if interrupts were active when entering.
-        if pm & 1 == 0 {
-            unsafe { enable() }
-        }
-
-        r
-    }
-} 

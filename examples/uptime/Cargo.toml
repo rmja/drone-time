@@ -29,7 +29,7 @@ drone-cortexm = { version = "0.14.0", features = ["bit-band", "floating-point-un
 drone-stm32-map = { version = "0.14.0", features = ["tim"], path = "../../../drone-stm32-map" }
 drone-stm32f4-hal = { version = "0.1.0", features = ["rcc", "tim"], path="../../../drone-stm32f4-hal" }
 futures = { version = "0.3.0", default-features = false }
-drone-time = { features = ["systick", "stm32"], path = "../.." }
+drone-time = { features = ["systick-experimental", "stm32"], path = "../.." }
 
 [profile.release]
 lto = true
