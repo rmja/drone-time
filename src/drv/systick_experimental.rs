@@ -54,7 +54,7 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         if preempted_sp != 0 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
-            let preempted_r0 = unsafe { core::ptr::read_volatile((preempted_sp as *const usize).add(SP_TO_R0_OFFSET)) };
+            let preempted_r0 = unsafe { core::ptr::read_volatile((preempted_sp & 0xFFFFFFFE as *const usize).add(SP_TO_R0_OFFSET)) };
             if preempted_r0 == 0 {
                 // The preempted thread has not yet read SYSTICK_CTRL - its value is invalid.
                 // Steal the stack pointer atomic from the preempted thread
