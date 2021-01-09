@@ -1,19 +1,15 @@
 use core::{marker::PhantomData, ops::Sub};
 
-use crate::{Tick, TimeSpan, Uptime, adapters::muxtimer::{Timer, TimerStop}};
+use crate::{Tick, TimeSpan, Uptime, adapters::muxtimer::{MuxAlarm, TimerStop}};
 
-/// Error returned from [`Timer::interval`] on overflow.
-#[derive(Debug)]
-pub struct TimerOverflow;
-
-pub struct MuxTimer<'a, U: Uptime<T>, T: Tick, BackingTimer: Timer<A>, A> {
+pub struct MuxTimer<'a, U: Uptime<T>, T: Tick, Alarm: MuxAlarm<A>, A> {
     uptime: &'a U,
     subscriptions: Vec<Subscription>,
     tick: PhantomData<T>,
-    running_timer: Option<RunningTimer<BackingTimer::Stop>>,
+    running_alarm: Option<RunningAlarm<Alarm::Stop>>,
 }
 
-struct RunningTimer<Stop: TimerStop> {
+struct RunningAlarm<Stop: TimerStop> {
     started: u64,
     stop: Stop,
 }
@@ -24,7 +20,7 @@ pub struct Subscription {
     remaining: u64,
 }
 
-impl<U: Uptime<T>, T: Tick, BackingTimer: Timer<A>, A> MuxTimer<'_, U, T, BackingTimer, A> {
+impl<U: Uptime<T>, T: Tick, Alarm: MuxAlarm<A>, A> MuxTimer<'_, U, T, Alarm, A> {
     /// Returns a future that resolves when `duration` time is elapsed.
     pub fn timeout(&mut self, timeout: TimeSpan<T>) -> &Subscription {
         let now = self.uptime.now();
@@ -41,7 +37,7 @@ impl<U: Uptime<T>, T: Tick, BackingTimer: Timer<A>, A> MuxTimer<'_, U, T, Backin
     }
 
     fn adjust(&mut self, now: TimeSpan<T>) {
-        let passed = match self.running_timer.take() {
+        let passed = match self.running_alarm.take() {
             Some(mut running) => {
                 running.stop.stop();
                 now.0 - running.started

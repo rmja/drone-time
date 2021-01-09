@@ -1,4 +1,4 @@
-use crate::UptimeTimer;
+use crate::UptimeAlarm;
 use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::tim::{
     advanced::AdvancedTimMap,
@@ -16,7 +16,7 @@ impl<Tim: GeneralTimMap> Stm32GeneralTimDrv<Tim> {
 
 unsafe impl<Tim: GeneralTimMap> Sync for Stm32GeneralTimDrv<Tim> {}
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms> UptimeTimer<Stm32GeneralTimDrv<Tim>>
+impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms> UptimeAlarm<Stm32GeneralTimDrv<Tim>>
     for Stm32GeneralTimDrv<Tim>
 {
     fn start(&self) {

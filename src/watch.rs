@@ -52,12 +52,12 @@ pub mod tests {
         token::Token,
     };
 
-    use crate::Month;
+    use crate::{UptimeAlarm, UptimeDrv, Month};
 
     use super::*;
 
     struct TestTick;
-    struct TestTimer;
+    struct TestAlarm;
 
     #[derive(Clone, Copy)]
     struct TestToken;
@@ -77,7 +77,7 @@ pub mod tests {
         }
     }
 
-    impl UptimeTimer<TestTick> for TestTimer {
+    impl UptimeAlarm<TestTick> for TestAlarm {
         fn start(&self) {}
 
         fn counter(&self) -> u32 {
@@ -133,10 +133,10 @@ pub mod tests {
 
     #[test]
     fn set() {
-        let timer = TestTimer;
+        let alarm = TestAlarm;
         let thread = TestToken;
-        let uptime = Uptime::start(timer, thread, TestTick);
-        let mut watch = Watch::new(&uptime);
+        let uptime = UptimeDrv::start(alarm, thread, TestTick);
+        let mut watch = Watch::new(&*uptime);
 
         let now = watch.now();
         assert!(now.is_err());

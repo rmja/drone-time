@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::UptimeTimer;
+use crate::UptimeAlarm;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
@@ -13,7 +13,7 @@ impl SysTickDrv {
 
 unsafe impl Sync for SysTickDrv {}
 
-impl UptimeTimer<SysTickDrv> for SysTickDrv {
+impl UptimeAlarm<SysTickDrv> for SysTickDrv {
     fn start(&self) {
         // Enable timer
         self.0.stk_load.store(|r| r.write_reload(0xFF_FF_FF));
