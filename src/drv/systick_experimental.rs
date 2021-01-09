@@ -43,7 +43,11 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
         const SYSTICK_CTRL: usize = 0xE000E010;
         const SP_TO_R0_OFFSET: usize = 2;
         unsafe { asm!("nop") };
-        let mut r0 = 0; // Set register to an impossible SYSTICK_CTRL value.
+        // Set register to an impossible SYSTICK_CTRL value.
+        // This register is reserved for the SYSTICK_CTRL,
+        // so that any thread that may interrupt us can go and read its value
+        // as an offset of our stack pointer which we will save in a moment.
+        let mut r0 = 0;
         let my_sp: usize; // Get this threads stack pointer.
         unsafe { asm!("mov {}, SP", out(reg) my_sp) };
         let preempted_sp = self.2.compare_and_swap(0, my_sp, Ordering::AcqRel);
@@ -69,15 +73,14 @@ impl UptimeTimer<SysTickDrv> for SysTickDrv {
             r0 = SYSTICK_CTRL;
         }
 
-        let countflag = r0 & 0x10000 > 0; // Mask out the COUNTFLAG.
-        let is_pending = self.1.compare_and_swap(false, countflag, Ordering::AcqRel);
-
-        // The flag is now safely stored.
-        self.2.store(0, Ordering::Release);
-
-        unsafe { asm!("nop") };
-
-        is_pending
+        if self.2.compare_and_swap(my_sp, preempted_sp, Ordering::AcqRel) == 0 {
+            // The R0 value is valid
+            let countflag = r0 & 0x10000 > 0; // Mask out the COUNTFLAG.
+            self.1.compare_and_swap(false, countflag, Ordering::AcqRel)
+        }
+        else {
+            self.1.load(Ordering::Acquire)
+        }
     }
 
     fn clear_pending_overflow(&self) {
