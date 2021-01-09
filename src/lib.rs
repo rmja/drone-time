@@ -14,6 +14,7 @@ mod uptime;
 mod watch;
 
 pub use self::{
+    adapters::alarm::{AlarmTimer, AlarmTimerNext, AlarmTimerStop},
     adapters::tick::Tick,
     adapters::uptime::UptimeAlarm,
     datetime::{DateTime, Month},

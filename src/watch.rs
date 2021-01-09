@@ -52,7 +52,7 @@ pub mod tests {
         token::Token,
     };
 
-    use crate::{UptimeAlarm, UptimeDrv, Month};
+    use crate::{Month, UptimeAlarm, UptimeDrv};
 
     use super::*;
 
