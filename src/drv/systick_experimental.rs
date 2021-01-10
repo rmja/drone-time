@@ -89,7 +89,7 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
             atomic.compare_and_swap(my_sp, 1, Ordering::Release);
         }
 
-        // The truth is now in the latched atomic - re-read it.
+        // The truth is now latched in the atomic: re-read it.
         atomic.load(Ordering::Acquire) == 1
     }
 
