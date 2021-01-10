@@ -42,16 +42,21 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
         // Pseudo code - does not compile:
         const SYSTICK_CTRL: usize = 0xE000E010;
         const SP_TO_R0_OFFSET: usize = 2;
+        let atomic = &self.1;
         unsafe { asm!("nop") };
-        // Set register to an impossible SYSTICK_CTRL value.
+        // Set register r0 to an impossible SYSTICK_CTRL value.
         // This register is reserved for the SYSTICK_CTRL,
         // so that any thread that may interrupt us can go and read its value
         // as an offset of our stack pointer which we will save in a moment.
         let mut r0 = 0;
         let my_sp: usize; // Get this threads stack pointer.
         unsafe { asm!("mov {}, SP", out(reg) my_sp) };
-        let preempted_sp = self.1.compare_and_swap(0, my_sp, Ordering::AcqRel);
-        if preempted_sp != 0 {
+        // Store our stack pointer in the atomic. It can contain three different kinds of value:
+        // ==0 - The latched overflow flag is not set and no other thread is currently reading SYSTICK_CTRL.
+        // ==1 - The latched overflow flag is currently set.
+        // >=2 - The stack pointer of the thread that is currently reading SYSTICK_CTRL.
+        let preempted_sp = atomic.compare_and_swap(0, my_sp, Ordering::AcqRel);
+        if preempted_sp >= 2 {
             // We have preempted at least one thread.
             // Lets see if the other thread has yet read SYSTICK_CTRL into r0.
             let preempted_r0 = unsafe {
@@ -64,11 +69,11 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
                 // Steal the stack pointer atomic from the preempted thread
                 // as other interrupting threads should read our r0,
                 // and not the one we have just found to be invalid.
-                self.1
-                    .compare_and_swap(preempted_sp, my_sp, Ordering::Release);
+                atomic.compare_and_swap(preempted_sp, my_sp, Ordering::Release);
                 r0 = SYSTICK_CTRL;
             } else {
                 // The preempted thread had SYSTICK_CTRL read to R0 on its stack.
+                // Use that value instead of the just cleared SYSTICK_CTRL.
                 r0 = preempted_r0;
             }
         } else {
@@ -77,12 +82,15 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
         }
 
         if r0 & 0x10000 > 0 {
-            // COUNTFLAG is set
-            // Store the flag together with the stack pointer
-            self.1.compare_and_swap(my_sp, my_sp | 1, Ordering::AcqRel) & 1 > 0
-        } else {
-            self.1.load(Ordering::Acquire) & 1 > 0
+            // COUNTFLAG is set in R0
+            // Store the flag instead of our stack pointer, but only do so if we were not interrupted.
+            // If we were, we must not set the latched flag, as the preempting thread may have
+            // cleared the flag already.
+            atomic.compare_and_swap(my_sp, 1, Ordering::Release);
         }
+
+        // The truth is now in the latched atomic - re-read it.
+        atomic.load(Ordering::Acquire) == 1
     }
 
     fn clear_pending_overflow(&self) {
