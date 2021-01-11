@@ -1,11 +1,11 @@
-mod ch;
+mod gen_ch;
 #[macro_use]
 mod macros;
 mod mappings;
 mod gen;
 
 pub use self::{
-    ch::{TimCh1, TimCh2, TimCh3, TimCh4},
+    gen_ch::{TimCh1, TimCh2, TimCh3, TimCh4},
     gen::{
         GeneralTimDrv,
         NewGeneralCh1,

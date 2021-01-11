@@ -10,7 +10,7 @@ use drone_stm32_map::periph::tim::{
     },
 };
 
-use super::ch::TimCh;
+use super::gen_ch::TimCh;
 
 pub struct GeneralTimDrv<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> {
     tim: GeneralTimDiverged<Tim, Ch>,
