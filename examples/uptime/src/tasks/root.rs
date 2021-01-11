@@ -51,7 +51,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let setup = GeneralTimSetup::new(periph_tim2!(reg), pclk1, TimFreq::Nominal(consts::TIM2_FREQ));
     let tim2 = GeneralTimCfg::with_enabled_clock(setup);
-    let tim2 = Stm32GeneralTimDrv::new(tim2.release(), thr.tim_2, TimCh1);
+    let tim2 = GeneralTimDrv::new_ch1(tim2.release(), thr.tim_2);
     let uptime = UptimeDrv::start(
         tim2,
         thr.tim_2,
