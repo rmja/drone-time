@@ -1,5 +1,4 @@
 mod gen_ch;
-#[macro_use]
 mod macros;
 mod gen;
 mod mappings;
