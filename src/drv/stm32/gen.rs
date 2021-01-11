@@ -46,17 +46,6 @@ pub trait NewGeneralCh4<Tim: GeneralTimMap, Int: IntToken> {
     fn new_ch4(tim: GeneralTimPeriph<Tim>, tim_int: Int) -> Self;
 }
 
-#[macro_export]
-macro_rules! new_drv {
-    ($trait_name:ident<$tim:ident>.$fn_name:ident($tim_periph:ident) -> $tim_ch:ident) => {
-        impl<Int: drone_cortexm::thr::IntToken> $trait_name<$tim, Int> for crate::drv::stm32::gen::GeneralTimDrv<$tim, Int, $tim_ch> {
-            fn $fn_name(tim: $tim_periph<$tim>, tim_int: Int) -> Self {
-                Self::new(tim, tim_int)
-            }
-        }
-    };
-}
-
 impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
     UptimeAlarm<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
