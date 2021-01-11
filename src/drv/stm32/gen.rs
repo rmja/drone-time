@@ -6,17 +6,25 @@ use drone_cortexm::thr::IntToken;
 use drone_cortexm::{fib, thr::prelude::*};
 use drone_stm32_map::periph::tim::{
     general::{
-        traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms,
-        TimCr1Dir,
+        traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir
     },
 };
 
 use super::ch::TimCh;
 
 pub struct GeneralTimDrv<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> {
-    tim: GeneralTimPeriph<Tim>,
+    tim: GeneralTimDiverged<Tim, Ch>,
     tim_int: Int,
-    channel: PhantomData<Ch>,
+}
+
+pub struct GeneralTimDiverged<Tim: GeneralTimMap, Ch: TimCh<Tim>> {
+    pub(crate) tim_cr1: Tim::STimCr1,
+    pub(crate) tim_dier: Tim::CTimDier,
+    pub(crate) tim_sr: Tim::CTimSr,
+    pub(crate) tim_arr: Tim::STimArr,
+    pub(crate) tim_egr: Tim::STimEgr,
+    pub(crate) tim_cnt: Tim::STimCnt,
+    pub(crate) tim_ccr: Ch::STimCcr,
 }
 
 unsafe impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Sync
@@ -26,7 +34,7 @@ unsafe impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Sync
 
 impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> GeneralTimDrv<Tim, Int, Ch> {
     pub(crate) fn new(tim: GeneralTimPeriph<Tim>, tim_int: Int) -> Self {
-        Self { tim, tim_int, channel: PhantomData}
+        Self { tim: Ch::new_diverged(tim), tim_int }
     }
 }
 
@@ -106,27 +114,22 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
         0xFFFF
     }
 
-    /// Returns a future that resolves when the timer counter is equal to `compare`.
-    /// Note that compare is not a duration but an absolute timestamp.
-    fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+    fn next<'a>(&'a mut self, compare: u32) -> AlarmTimerNext<'a, Self::Stop> {
+        let tim_sr = self.tim.tim_sr;
+        let tim_dier = self.tim.tim_dier;
         let future = Box::pin(self.tim_int.add_future(fib::new_fn(move || {
-            // let mut ctrl_val = ctrl.load();
-            // if ctrl_val.countflag() {
-            //     ctrl.store_val(disable(&mut ctrl_val).val());
-            //     unsafe { set_bit(&pendstclr) };
-            //     fib::Complete(())
-            // } else {
-            //     fib::Yielded(())
-            // }
-            if true {
+            if Ch::is_pending(tim_sr) {
+                Ch::clear_pending(tim_sr);
+                Ch::disable_interrupt(tim_dier);
                 fib::Complete(())
-            } else {
+            }
+            else {
                 fib::Yielded(())
             }
         })));
 
-        Ch::set_compare(&self.tim, u16::try_from(compare).unwrap());
-        Ch::enable_interrupt(&self.tim);
+        Ch::set_compare(&self.tim.tim_ccr, u16::try_from(compare).unwrap());
+        Ch::enable_interrupt(self.tim.tim_dier);
 
         AlarmTimerNext::new(self, future)
     }
@@ -137,6 +140,6 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
 {
     fn stop(&mut self) {
         // Disable capture/compare interrupt.
-        Ch::disable_interrupt(&self.tim);
+        Ch::disable_interrupt(self.tim.tim_dier);
     }
 }
