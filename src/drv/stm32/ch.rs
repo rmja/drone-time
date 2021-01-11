@@ -9,29 +9,13 @@ use drone_stm32_map::periph::tim::{
 
 use super::gen::GeneralTimDiverged;
 
-pub struct TimCh1<Tim: GeneralTimMap> {
-    tim_sr: Tim::CTimSr,
-    tim_dier: Tim::CTimDier,
-    tim_ccr1: Tim::CTimCcr1,
-}
+pub struct TimCh1;
 
-pub struct TimCh2<Tim: GeneralTimMap + TimCcr2> {
-    tim_sr: Tim::CTimSr,
-    tim_dier: Tim::CTimDier,
-    tim_ccr2: Tim::CTimCcr2,
-}
+pub struct TimCh2;
 
-pub struct TimCh3<Tim: GeneralTimMap + TimCcr3> {
-    tim_sr: Tim::CTimSr,
-    tim_dier: Tim::CTimDier,
-    tim_ccr3: Tim::CTimCcr3,
-}
+pub struct TimCh3;
 
-pub struct TimCh4<Tim: GeneralTimMap + TimCcr4> {
-    tim_sr: Tim::CTimSr,
-    tim_dier: Tim::CTimDier,
-    tim_ccr4: Tim::CTimCcr4,
-}
+pub struct TimCh4;
 
 pub trait TimCh<Tim: GeneralTimMap> where Self : Sized, Self::STimCcr: Send {
     type STimCcr;
@@ -49,7 +33,7 @@ pub trait TimCh<Tim: GeneralTimMap> where Self : Sized, Self::STimCcr: Send {
     fn clear_pending(tim_sr: Tim::CTimSr);
 }
 
-impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1<Tim> {
+impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1 {
     type STimCcr = Tim::STimCcr1;
 
     fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
@@ -88,7 +72,7 @@ impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1<Tim> {
     }
 }
 
-impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for TimCh2<Tim> {
+impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for TimCh2 {
     type STimCcr = Tim::STimCcr2;
 
     fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
@@ -127,7 +111,7 @@ impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for Ti
     }
 }
 
-impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for TimCh3<Tim> {
+impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for TimCh3 {
     type STimCcr = Tim::STimCcr3;
 
     fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
@@ -166,7 +150,7 @@ impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for Ti
     }
 }
 
-impl<Tim: GeneralTimMap + TimCcr4 + TimDierCc4Ie + TimSrCc4If> TimCh<Tim> for TimCh4<Tim> {
+impl<Tim: GeneralTimMap + TimCcr4 + TimDierCc4Ie + TimSrCc4If> TimCh<Tim> for TimCh4 {
     type STimCcr = Tim::STimCcr4;
 
     fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
