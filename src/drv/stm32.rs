@@ -1,4 +1,6 @@
 use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, UptimeAlarm};
+use core::convert::TryFrom;
+use core::marker::PhantomData;
 use drone_cortexm::reg::prelude::*;
 use drone_cortexm::thr::IntToken;
 use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
@@ -10,8 +12,6 @@ use drone_stm32_map::periph::tim::{
         TimCr1Dir, TimDierCc2Ie, TimDierCc3Ie, TimDierCc4Ie,
     },
 };
-use core::convert::TryFrom;
-use core::marker::PhantomData;
 
 pub struct Stm32GeneralTimDrv<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> {
     tim: GeneralTimPeriph<Tim>,
@@ -29,7 +29,10 @@ impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Stm32GeneralTimDrv<Tim, 
     }
 }
 
-unsafe impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Sync for Stm32GeneralTimDrv<Tim, Int, Ch> {}
+unsafe impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Sync
+    for Stm32GeneralTimDrv<Tim, Int, Ch>
+{
+}
 
 impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
     UptimeAlarm<Stm32GeneralTimDrv<Tim, Int, Ch>> for Stm32GeneralTimDrv<Tim, Int, Ch>
@@ -114,8 +117,8 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
     }
 }
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> + Send> AlarmTimerStop
-    for Stm32GeneralTimDrv<Tim, Int, Ch>
+impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> + Send>
+    AlarmTimerStop for Stm32GeneralTimDrv<Tim, Int, Ch>
 {
     fn stop(&mut self) {
         // Disable capture/compare interrupt.
