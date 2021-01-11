@@ -1,10 +1,7 @@
 use drone_cortexm::reg::prelude::*;
-use drone_stm32_map::periph::tim::{
-    general::{
-        traits::*, GeneralTimMap, GeneralTimPeriph, TimCcr2, TimCcr3, TimCcr4,
-        TimDierCc2Ie, TimDierCc3Ie, TimDierCc4Ie,
-        TimSrCc2If, TimSrCc3If, TimSrCc4If,
-    },
+use drone_stm32_map::periph::tim::general::{
+    traits::*, GeneralTimMap, GeneralTimPeriph, TimCcr2, TimCcr3, TimCcr4, TimDierCc2Ie,
+    TimDierCc3Ie, TimDierCc4Ie, TimSrCc2If, TimSrCc3If, TimSrCc4If,
 };
 
 use super::gen::GeneralTimDiverged;
@@ -17,12 +14,16 @@ pub struct TimCh3;
 
 pub struct TimCh4;
 
-pub trait TimCh<Tim: GeneralTimMap> where Self : Sized, Self::STimCcr: Send {
+pub trait TimCh<Tim: GeneralTimMap>
+where
+    Self: Sized,
+    Self::STimCcr: Send,
+{
     type STimCcr;
 
     fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self>;
     /// Set compare register for the channel.
-    fn set_compare(tim_ccr: &Self::STimCcr,  value: u16);
+    fn set_compare(tim_ccr: &Self::STimCcr, value: u16);
     /// Enable the channel interrupt.
     fn enable_interrupt(tim_dier: Tim::CTimDier);
     /// Disable the channel interrupt.

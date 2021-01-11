@@ -1,13 +1,8 @@
 use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, UptimeAlarm};
 use core::convert::TryFrom;
-use core::marker::PhantomData;
-use drone_cortexm::reg::prelude::*;
-use drone_cortexm::thr::IntToken;
-use drone_cortexm::{fib, thr::prelude::*};
-use drone_stm32_map::periph::tim::{
-    general::{
-        traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir
-    },
+use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
+use drone_stm32_map::periph::tim::general::{
+    traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir,
 };
 
 use super::gen_ch::TimCh;
@@ -34,7 +29,10 @@ unsafe impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> Sync
 
 impl<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> GeneralTimDrv<Tim, Int, Ch> {
     pub(crate) fn new(tim: GeneralTimPeriph<Tim>, tim_int: Int) -> Self {
-        Self { tim: Ch::new_diverged(tim), tim_int }
+        Self {
+            tim: Ch::new_diverged(tim),
+            tim_int,
+        }
     }
 }
 
@@ -122,8 +120,7 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
                 Ch::clear_pending(tim_sr);
                 Ch::disable_interrupt(tim_dier);
                 fib::Complete(())
-            }
-            else {
+            } else {
                 fib::Yielded(())
             }
         })));
