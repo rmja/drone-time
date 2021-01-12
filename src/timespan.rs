@@ -30,6 +30,10 @@ impl<T: Tick> TimeSpan<T> {
     const MAX_SECONDS: u32 = u32::MAX;
     const MAX_MILLISECONDS: u64 = Self::MAX_SECONDS as u64 * 1000;
     const MAX_DAYS: u16 = (Self::MAX_SECONDS / 60 / 60 / 24) as u16;
+    const TICKS_PER_SECOND: u64 = T::FREQ as u64;
+    const TICKS_PER_MINUTE: u64 = Self::TICKS_PER_SECOND * 60;
+    const TICKS_PER_HOUR: u64 = Self::TICKS_PER_MINUTE * 60;
+    const TICKS_PER_DAY: u64 = Self::TICKS_PER_HOUR * 24;
 
     pub fn new(hours: u16, minutes: u8, seconds: u8) -> Self {
         Self::from_parts(TimeSpanParts {
@@ -48,16 +52,16 @@ impl<T: Tick> TimeSpan<T> {
         assert!(parts.seconds < 60);
         assert!(parts.milliseconds < 1000);
 
-        let ticks = parts.days as u64 * Self::ticks_per_day()
-            + parts.hours as u64 * Self::ticks_per_hour()
-            + parts.minutes as u64 * Self::ticks_per_minute()
-            + parts.seconds as u64 * Self::ticks_per_second()
-            + (parts.milliseconds as u64 * Self::ticks_per_second()) / 1000;
+        let ticks = parts.days as u64 * Self::TICKS_PER_DAY
+            + parts.hours as u64 * Self::TICKS_PER_HOUR
+            + parts.minutes as u64 * Self::TICKS_PER_MINUTE
+            + parts.seconds as u64 * Self::TICKS_PER_SECOND
+            + (parts.milliseconds as u64 * Self::TICKS_PER_SECOND) / 1000;
         Self::from_ticks(ticks)
     }
 
     pub fn from_seconds(seconds: u32) -> Self {
-        Self::from_ticks(seconds as u64 * Self::ticks_per_second())
+        Self::from_ticks(seconds as u64 * Self::TICKS_PER_SECOND)
     }
 
     pub fn from_milliseconds(milliseconds: u64) -> Self {
@@ -65,8 +69,8 @@ impl<T: Tick> TimeSpan<T> {
 
         let seconds = milliseconds / 1000;
         let sub_seconds = milliseconds - seconds * 1000;
-        let ticks = seconds * Self::ticks_per_second()
-            + (sub_seconds * 1000 * Self::ticks_per_second()) / 1000;
+        let ticks = seconds * Self::TICKS_PER_SECOND
+            + (sub_seconds * 1000 * Self::TICKS_PER_SECOND) / 1000;
         Self::from_ticks(ticks)
     }
 
@@ -77,20 +81,20 @@ impl<T: Tick> TimeSpan<T> {
     pub fn parts(&self) -> TimeSpanParts {
         let mut ticks = self.0;
 
-        let days = ticks / Self::ticks_per_day();
-        ticks -= days * Self::ticks_per_day();
+        let days = ticks / Self::TICKS_PER_DAY;
+        ticks -= days * Self::TICKS_PER_DAY;
 
-        let hours = ticks / Self::ticks_per_hour();
-        ticks -= hours * Self::ticks_per_hour();
+        let hours = ticks / Self::TICKS_PER_HOUR;
+        ticks -= hours * Self::TICKS_PER_HOUR;
 
-        let minutes = ticks / Self::ticks_per_minute();
-        ticks -= minutes * Self::ticks_per_minute();
+        let minutes = ticks / Self::TICKS_PER_MINUTE;
+        ticks -= minutes * Self::TICKS_PER_MINUTE;
 
-        let seconds = ticks / Self::ticks_per_second();
-        ticks -= seconds * Self::ticks_per_second();
+        let seconds = ticks / Self::TICKS_PER_SECOND;
+        ticks -= seconds * Self::TICKS_PER_SECOND;
 
         // Round to nearest.
-        let milliseconds = (ticks * 1000 + Self::ticks_per_second() / 2) / Self::ticks_per_second();
+        let milliseconds = (ticks * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND;
 
         TimeSpanParts {
             days: days as u16,
@@ -102,31 +106,15 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     pub fn total_seconds(&self) -> u32 {
-        (self.0 / Self::ticks_per_second()) as u32
+        (self.0 / Self::TICKS_PER_SECOND) as u32
     }
 
     pub fn total_milliseconds(&self) -> u64 {
         let seconds = self.total_seconds() as u64;
-        let sub_seconds = self.0 - seconds * Self::ticks_per_second();
+        let sub_seconds = self.0 - seconds * Self::TICKS_PER_SECOND;
         // Round to nearest.
         seconds * 1000
-            + (sub_seconds * 1000 + Self::ticks_per_second() / 2) / Self::ticks_per_second()
-    }
-
-    fn ticks_per_second() -> u64 {
-        T::freq() as u64
-    }
-
-    fn ticks_per_minute() -> u64 {
-        Self::ticks_per_second() * 60
-    }
-
-    fn ticks_per_hour() -> u64 {
-        Self::ticks_per_minute() * 60
-    }
-
-    fn ticks_per_day() -> u64 {
-        Self::ticks_per_hour() * 24
+            + (sub_seconds * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND
     }
 }
 
@@ -188,9 +176,7 @@ pub mod tests {
     struct TestTick;
 
     impl Tick for TestTick {
-        fn freq() -> u32 {
-            32768
-        }
+        const FREQ: u32 = 32768;
     }
 
     #[test]

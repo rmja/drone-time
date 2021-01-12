@@ -1,4 +1,4 @@
 pub trait Tick: Send {
-    // const FREQ: u32;
-    fn freq() -> u32;
+    /// The tick frequency, i.e. the number of ticks per second.
+    const FREQ: u32;
 }

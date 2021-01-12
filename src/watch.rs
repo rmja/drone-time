@@ -72,9 +72,7 @@ pub mod tests {
     };
 
     impl Tick for TestTick {
-        fn freq() -> u32 {
-            32768
-        }
+        const FREQ: u32 = 32768;
     }
 
     impl UptimeAlarm<TestTick> for TestAlarm {

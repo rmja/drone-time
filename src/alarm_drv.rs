@@ -69,9 +69,7 @@ pub mod tests {
     }
 
     impl Tick for TestTimer {
-        fn freq() -> u32 {
-            1
-        }
+        const FREQ: u32 = 1;
     }
 
     impl AlarmTimer<TestTimer, TestTimer> for TestTimer {

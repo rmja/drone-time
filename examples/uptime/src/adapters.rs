@@ -3,14 +3,10 @@ use drone_time::Tick;
 
 pub struct SysTickUptimeTick;
 impl Tick for SysTickUptimeTick {
-    fn freq() -> u32 {
-        consts::SYSTICKCLK.f()
-    }
+    const FREQ: u32 = consts::SYSCLK.f();
 }
 
 pub struct Tim2UptimeTick;
 impl Tick for Tim2UptimeTick {
-    fn freq() -> u32 {
-        consts::TIM2_FREQ
-    }
+    const FREQ: u32 = consts::TIM2_FREQ;
 }
