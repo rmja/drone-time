@@ -13,6 +13,7 @@ pub mod drv;
 mod muxalarm;
 mod timespan;
 mod uptime;
+mod uptime_drv;
 mod watch;
 
 pub use self::{
@@ -23,7 +24,8 @@ pub use self::{
     alarm_drv::AlarmDrv,
     datetime::{DateTime, Month},
     timespan::TimeSpan,
-    uptime::{Uptime, UptimeDrv},
+    uptime::Uptime,
+    uptime_drv::UptimeDrv,
     watch::Watch,
 };
 
