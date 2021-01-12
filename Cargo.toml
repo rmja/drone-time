@@ -23,7 +23,7 @@ systick-experimental = ["drone-cortexm"]
 stm32 = ["drone-stm32-map"]
 std = [
     "drone-core/std",
-    "drone-cortexm/std"
+    "drone-cortexm/std",
 ]
 
 [dependencies]
