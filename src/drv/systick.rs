@@ -79,7 +79,7 @@ mod interrupt {
         #[cfg(not(feature = "std"))]
         {
             compiler_fence(Ordering::SeqCst);
-            unsafe { asm!("cpsie i") };
+            asm!("cpsie i");
         }
     }
 

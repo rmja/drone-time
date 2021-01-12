@@ -107,7 +107,7 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
         self.tim.tim_cnt.cnt().read_bits() as u32
     }
 
-    fn next<'a>(&'a mut self, compare: u32) -> AlarmTimerNext<'a, Self::Stop> {
+    fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
         let tim_sr = self.tim.tim_sr;
         let tim_dier = self.tim.tim_dier;
         let future = Box::pin(self.tim_int.add_future(fib::new_fn(move || {

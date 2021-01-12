@@ -194,6 +194,7 @@ const fn days_in_year(year: u16) -> u16 {
     }
 }
 
+#[allow(clippy::needless_bool)]
 const fn is_leap_year(year: u16) -> bool {
     if year % 4 > 0 {
         false
