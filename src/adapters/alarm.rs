@@ -57,3 +57,45 @@ impl<'a, T: AlarmTimerStop> Drop for AlarmTimerNext<'a, T> {
         self.stop.stop();
     }
 }
+
+#[cfg(test)]
+pub mod fakes {
+    use futures::future;
+
+    use super::*;
+
+    pub struct FakeAlarmTimer {
+        pub(crate) counter: u32,
+        pub(crate) running: bool,
+        pub(crate) compares: Vec<u32>,
+    }
+
+    impl Tick for FakeAlarmTimer {
+        const FREQ: u32 = 1;
+    }
+
+    impl AlarmTimer<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
+        type Stop = Self;
+        const MAX: u32 = 9;
+
+        fn counter(&self) -> u32 {
+            self.counter
+        }
+
+        fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+            assert!(compare <= Self::MAX);
+            assert!(!self.running);
+            self.compares.push(compare);
+            self.running = true;
+            let fut = Box::pin(future::ready(()));
+            AlarmTimerNext::new(self, fut)
+        }
+    }
+
+    impl AlarmTimerStop for FakeAlarmTimer {
+        fn stop(&mut self) {
+            assert!(self.running);
+            self.running = false;
+        }
+    }
+}

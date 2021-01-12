@@ -58,48 +58,13 @@ pub mod tests {
     use futures::future;
     use futures_await_test::async_test;
 
-    use crate::{AlarmTimerNext, AlarmTimerStop};
+    use crate::adapters::alarm::fakes::FakeAlarmTimer;
 
     use super::*;
 
-    struct TestTimer {
-        counter: u32,
-        running: bool,
-        compares: Vec<u32>,
-    }
-
-    impl Tick for TestTimer {
-        const FREQ: u32 = 1;
-    }
-
-    impl AlarmTimer<TestTimer, TestTimer> for TestTimer {
-        type Stop = Self;
-        const MAX: u32 = 9;
-
-        fn counter(&self) -> u32 {
-            self.counter
-        }
-
-        fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
-            assert!(compare <= Self::MAX);
-            assert!(!self.running);
-            self.compares.push(compare);
-            self.running = true;
-            let fut = Box::pin(future::ready(()));
-            AlarmTimerNext::new(self, fut)
-        }
-    }
-
-    impl AlarmTimerStop for TestTimer {
-        fn stop(&mut self) {
-            assert!(self.running);
-            self.running = false;
-        }
-    }
-
     #[async_test]
     async fn sleep_less_than_a_period() {
-        let timer = TestTimer {
+        let timer = FakeAlarmTimer {
             counter: 4,
             running: false,
             compares: Vec::new(),
@@ -113,7 +78,7 @@ pub mod tests {
 
     #[async_test]
     async fn sleep_a_period() {
-        let timer = TestTimer {
+        let timer = FakeAlarmTimer {
             counter: 4,
             running: false,
             compares: Vec::new(),
@@ -127,7 +92,7 @@ pub mod tests {
 
     #[async_test]
     async fn sleep_more_than_a_period() {
-        let timer = TestTimer {
+        let timer = FakeAlarmTimer {
             counter: 4,
             running: false,
             compares: Vec::new(),
@@ -141,7 +106,7 @@ pub mod tests {
 
     #[test]
     fn sleep_drop() {
-        let timer = TestTimer {
+        let timer = FakeAlarmTimer {
             counter: 4,
             running: false,
             compares: Vec::new(),
