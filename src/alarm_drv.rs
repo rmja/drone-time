@@ -100,8 +100,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        let sleep = alarm.sleep(9);
-        sleep.await;
+        alarm.sleep(9).await;
 
         assert_eq!(vec![3], alarm.timer.compares);
     }
@@ -115,8 +114,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        let sleep = alarm.sleep(10);
-        sleep.await;
+        alarm.sleep(10).await;
 
         assert_eq!(vec![9, 4], alarm.timer.compares);
     }
@@ -130,9 +128,22 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        let sleep = alarm.sleep(21);
-        sleep.await;
+        alarm.sleep(21).await;
 
         assert_eq!(vec![9, 4, 9, 5], alarm.timer.compares);
+    }
+
+    fn sleep_drop() {
+        let timer = TestTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+        let mut alarm = AlarmDrv::new(timer);
+
+        let sleep = alarm.sleep(123);
+        drop(sleep);
+
+        assert!(!alarm.timer.running);
     }
 }
