@@ -25,8 +25,11 @@ impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
 
 #[async_trait]
 impl<Timer: AlarmTimer<A>, A: Send> Alarm for AlarmDrv<Timer, A> {
-    async fn sleep(&mut self, duration: u64) {
-        let mut base = self.timer.counter();
+    fn counter(&self) -> u32 {
+        self.timer.counter()
+    }
+
+    async fn sleep_from(&mut self, mut base: u32, duration: u64) {
         let mut remaining = duration;
 
         // The maximum delay is half the counters increment.
