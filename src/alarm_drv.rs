@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::{AlarmTimer, Tick, TimeSpan, alarm::*};
+use crate::{alarm::*, AlarmTimer, Tick, TimeSpan};
 use async_trait::async_trait;
 
 pub struct AlarmDrv<Timer: AlarmTimer<T, A>, T: Tick, A> {
@@ -26,12 +26,17 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> AlarmDrv<Timer, T, A> {
 }
 
 #[async_trait]
-impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<T> for AlarmDrv<Timer, T, A> {
+impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<T> for AlarmDrv<Timer, T, A> {
+    const MAX: u32 = Timer::MAX;
+
     fn counter(&self) -> u32 {
         self.timer.counter()
     }
 
-    async fn sleep_from(&mut self, mut base: u32, duration: TimeSpan<T>) {
+    async fn sleep_from(&mut self, mut base: u32, duration: TimeSpan<T>)
+    where
+        T: 'async_trait,
+    {
         let mut remaining = duration.0;
 
         // The maximum delay is half the counters increment.

@@ -10,7 +10,7 @@ mod alarm;
 mod alarm_drv;
 mod datetime;
 pub mod drv;
-mod muxalarm;
+mod sharedalarm;
 mod timespan;
 mod uptime;
 mod uptime_drv;

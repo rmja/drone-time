@@ -69,8 +69,8 @@ impl<T: Tick> TimeSpan<T> {
 
         let seconds = milliseconds / 1000;
         let sub_seconds = milliseconds - seconds * 1000;
-        let ticks = seconds * Self::TICKS_PER_SECOND
-            + (sub_seconds * 1000 * Self::TICKS_PER_SECOND) / 1000;
+        let ticks =
+            seconds * Self::TICKS_PER_SECOND + (sub_seconds * 1000 * Self::TICKS_PER_SECOND) / 1000;
         Self::from_ticks(ticks)
     }
 
@@ -113,8 +113,7 @@ impl<T: Tick> TimeSpan<T> {
         let seconds = self.total_seconds() as u64;
         let sub_seconds = self.0 - seconds * Self::TICKS_PER_SECOND;
         // Round to nearest.
-        seconds * 1000
-            + (sub_seconds * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND
+        seconds * 1000 + (sub_seconds * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND
     }
 }
 
