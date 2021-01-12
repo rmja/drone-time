@@ -1,93 +1,138 @@
-// use core::{future::Future, marker::PhantomData, pin::Pin, task::{Context, Poll}};
+use core::marker::PhantomData;
 
-// use crate::{AlarmTimer, alarm::*};
+use crate::{alarm::*, AlarmTimer};
+use async_trait::async_trait;
 
-// pub struct AlarmDrv<Timer: AlarmTimer<A>, A> {
-//     timer: Timer,
-//     interval: u64,
-//     remaining: u64,
-//     compare: u32,
-//     adapter: PhantomData<A>,
-// }
+pub struct AlarmDrv<Timer: AlarmTimer<A>, A> {
+    timer: Timer,
+    adapter: PhantomData<A>,
+}
 
-// struct SharedState {
-//     remaining: u64,
-//     compare: u32,
-// }
+impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
+    pub fn new(timer: Timer) -> Self {
+        Self {
+            timer,
+            adapter: PhantomData,
+        }
+    }
 
-// impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
-//     fn advance(&mut self, base: u32) {
-//         // The maximum delay is half the counters increment.
-//         // This ensures that we can hit the actual fire time directly when the last timeout is setup.
+    fn counter_add(base: u32, duration: u32) -> u32 {
+        assert!(base <= Timer::counter_max());
+        assert!(duration <= Timer::counter_max());
+        ((base as u64 + duration as u64) % Timer::overflow_increment()) as u32
+    }
+}
 
-//         self.compare = if self.remaining < Timer::overflow_increment() {
-//             self.remaining as u32
-//         } else {
-//             (Timer::overflow_increment() / 2) as u32
-//         };
+#[async_trait]
+impl<Timer: AlarmTimer<A>, A: Send> Alarm for AlarmDrv<Timer, A> {
+    async fn sleep(&mut self, duration: u64) {
+        let mut base = self.timer.counter();
+        let mut remaining = duration;
 
-//         let compare = base + self.compare;
-//         let handle = self.timer.next(compare);
-//         handle.root_wait();
-//     }
+        // The maximum delay is half the counters increment.
+        // This ensures that we can hit the actual fire time directly when the last timeout is setup.
+        let half_period = (Timer::overflow_increment() / 2) as u32;
 
-//     fn timer_fire(&mut self, capture: u32) {
-//         let mut invoke_count = 0;
-//         let compare = self.compare as u64;
+        while remaining >= Timer::overflow_increment() {
+            // We can setup the final time
+            let compare = Self::counter_add(base, half_period);
+            self.timer.next(compare);
+            base = compare;
+            remaining -= half_period as u64;
+        }
 
-//         if compare < self.remaining {
-//             // The alarm fired before the final time.
-//             self.remaining -= compare;
-//         }
-//         else if compare == self.remaining {
-//             if self.interval > 0 {
-//                 // Multi-shot, periodic timer
-//             }
-//             else {
-//                 // Single-shot timer
-//                 invoke_count = 1;
-//                 self.remaining = 0;
-//             }
-//         }
+        if remaining > 0 {
+            let compare = Self::counter_add(base, remaining as u32);
+            self.timer.next(compare);
+        }
+    }
+}
 
-//         if self.remaining > 0 {
-//             // Setup next timeout if this was an intermediate timeout,
-//             // or if the timer is periodic.
+#[cfg(test)]
+pub mod tests {
+    use futures::future;
+    use futures_await_test::async_test;
 
-//             self.advance(capture);
-//         }
+    use crate::{AlarmTimerNext, AlarmTimerStop};
 
-//         for i in 0..invoke_count {
-//             // TODO: Invoke callback
-//         }
-//     }
-// }
+    use super::*;
 
-// impl<Timer: AlarmTimer<A>, A: Send> Alarm for AlarmDrv<Timer, A> {
-//     type Stop = Self;
+    struct TestTimer {
+        counter: u32,
+        running: bool,
+        compares: Vec<u32>,
+    }
 
-//     fn sleep(&mut self, duration: u64) -> TimerSleep<'_, Self::Stop> {
-//         let now = self.timer.counter();
+    impl AlarmTimer<TestTimer> for TestTimer {
+        type Stop = Self;
 
-//         self.interval = 0;
-//         self.remaining = duration;
-//         self.advance(now);
+        fn counter(&self) -> u32 {
+            self.counter
+        }
 
-//         todo!();
-//         // TimerSleep::new(self, future)
-//     }
-// }
+        fn counter_max() -> u32 {
+            9
+        }
 
-// impl<'a, T: TimerStop> Future for TimerSleep<'a, T> {
-//     type Output = ();
+        fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+            assert!(compare <= Self::counter_max());
+            assert!(!self.running);
+            self.compares.push(compare);
+            self.running = true;
+            let fut = Box::pin(future::ready(()));
+            AlarmTimerNext::new(self, fut)
+        }
+    }
 
-//     #[inline]
-//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-//         todo!();
-//     }
-// }
+    impl AlarmTimerStop for TestTimer {
+        fn stop(&mut self) {
+            assert!(self.running);
+            self.running = false;
+        }
+    }
 
-// impl<Timer: AlarmTimer<A>, A: Send> TimerStop for AlarmDrv<Timer, A> {
-//     fn stop(&mut self) {
-//     }
-// }
+    #[async_test]
+    async fn sleep_less_than_a_period() {
+        let timer = TestTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+        let mut alarm = AlarmDrv::new(timer);
+
+        let sleep = alarm.sleep(9);
+        sleep.await;
+
+        assert_eq!(vec![3], alarm.timer.compares);
+    }
+
+    #[async_test]
+    async fn sleep_a_period() {
+        let timer = TestTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+        let mut alarm = AlarmDrv::new(timer);
+
+        let sleep = alarm.sleep(10);
+        sleep.await;
+
+        assert_eq!(vec![9, 4], alarm.timer.compares);
+    }
+
+    #[async_test]
+    async fn sleep_more_than_a_period() {
+        let timer = TestTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+        let mut alarm = AlarmDrv::new(timer);
+
+        let sleep = alarm.sleep(21);
+        sleep.await;
+
+        assert_eq!(vec![9, 4, 9, 5], alarm.timer.compares);
+    }
+}

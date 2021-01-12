@@ -1,6 +1,6 @@
+mod gen;
 mod gen_ch;
 mod macros;
-mod gen;
 mod mappings;
 
 pub use self::{
