@@ -1,17 +1,19 @@
 use core::marker::PhantomData;
 
-use crate::{alarm::*, AlarmTimer};
+use crate::{AlarmTimer, Tick, TimeSpan, alarm::*};
 use async_trait::async_trait;
 
-pub struct AlarmDrv<Timer: AlarmTimer<A>, A> {
+pub struct AlarmDrv<Timer: AlarmTimer<T, A>, T: Tick, A> {
     timer: Timer,
+    tick: PhantomData<T>,
     adapter: PhantomData<A>,
 }
 
-impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
+impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> AlarmDrv<Timer, T, A> {
     pub fn new(timer: Timer) -> Self {
         Self {
             timer,
+            tick: PhantomData,
             adapter: PhantomData,
         }
     }
@@ -24,13 +26,13 @@ impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
 }
 
 #[async_trait]
-impl<Timer: AlarmTimer<A>, A: Send> Alarm for AlarmDrv<Timer, A> {
+impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<T> for AlarmDrv<Timer, T, A> {
     fn counter(&self) -> u32 {
         self.timer.counter()
     }
 
-    async fn sleep_from(&mut self, mut base: u32, duration: u64) {
-        let mut remaining = duration;
+    async fn sleep_from(&mut self, mut base: u32, duration: TimeSpan<T>) {
+        let mut remaining = duration.0;
 
         // The maximum delay is half the counters increment.
         // This ensures that we can hit the actual fire time directly when the last timeout is setup.
@@ -66,7 +68,13 @@ pub mod tests {
         compares: Vec<u32>,
     }
 
-    impl AlarmTimer<TestTimer> for TestTimer {
+    impl Tick for TestTimer {
+        fn freq() -> u32 {
+            1
+        }
+    }
+
+    impl AlarmTimer<TestTimer, TestTimer> for TestTimer {
         type Stop = Self;
         const MAX: u32 = 9;
 
@@ -100,7 +108,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        alarm.sleep(9).await;
+        alarm.sleep(TimeSpan::from_ticks(9)).await;
 
         assert_eq!(vec![3], alarm.timer.compares);
     }
@@ -114,7 +122,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        alarm.sleep(10).await;
+        alarm.sleep(TimeSpan::from_ticks(10)).await;
 
         assert_eq!(vec![9, 4], alarm.timer.compares);
     }
@@ -128,7 +136,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        alarm.sleep(21).await;
+        alarm.sleep(TimeSpan::from_ticks(21)).await;
 
         assert_eq!(vec![9, 4, 9, 5], alarm.timer.compares);
     }
@@ -142,7 +150,7 @@ pub mod tests {
         };
         let mut alarm = AlarmDrv::new(timer);
 
-        let sleep = alarm.sleep(123);
+        let sleep = alarm.sleep(TimeSpan::from_ticks(123));
         drop(sleep);
 
         assert!(!alarm.timer.running);

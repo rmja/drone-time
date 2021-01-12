@@ -4,7 +4,9 @@ use core::{
     task::{Context, Poll},
 };
 
-pub trait AlarmTimer<A>: Send {
+use crate::Tick;
+
+pub trait AlarmTimer<T: Tick, A>: Send {
     /// AlarmTimer stop handler.
     type Stop: AlarmTimerStop;
 

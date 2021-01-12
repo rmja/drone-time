@@ -1,4 +1,4 @@
-use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, UptimeAlarm};
+use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, Tick, UptimeAlarm};
 use core::convert::TryFrom;
 use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::tim::general::{
@@ -97,8 +97,8 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
     }
 }
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> + Send>
-    AlarmTimer<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
+impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> + Send, T: Tick>
+    AlarmTimer<T, GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
     type Stop = Self;
     const MAX: u32 = 0xFFFF;
