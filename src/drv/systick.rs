@@ -55,15 +55,19 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
 }
 
 mod interrupt {
+    #[cfg(not(feature = "std"))]
     use core::sync::atomic::{compiler_fence, Ordering};
 
     /// Disables all interrupts
     #[inline]
     pub fn disable() {
         #[cfg(feature = "std")]
-        return unimplemented!();
-        unsafe { asm!("cpsid i") };
-        compiler_fence(Ordering::SeqCst);
+        unimplemented!();
+        #[cfg(not(feature = "std"))]
+        {
+            unsafe { asm!("cpsid i") };
+            compiler_fence(Ordering::SeqCst);
+        }
     }
 
     /// Enables all (not masked) interrupts
@@ -74,18 +78,24 @@ mod interrupt {
     #[inline]
     pub unsafe fn enable() {
         #[cfg(feature = "std")]
-        return unimplemented!();
-        compiler_fence(Ordering::SeqCst);
-        unsafe { asm!("cpsie i") };
+        unimplemented!();
+        #[cfg(not(feature = "std"))]
+        {
+            compiler_fence(Ordering::SeqCst);
+            unsafe { asm!("cpsie i") };
+        }
     }
 
     #[inline]
     fn primask() -> u32 {
         #[cfg(feature = "std")]
-        return unimplemented!();
-        let r: usize;
-        unsafe { asm!("mrs {}, PRIMASK", out(reg) r) };
-        r as u32
+        unimplemented!();
+        #[cfg(not(feature = "std"))]
+        {
+            let r: usize;
+            unsafe { asm!("mrs {}, PRIMASK", out(reg) r) };
+            r as u32
+        }
     }
 
     /// Critical section token.
