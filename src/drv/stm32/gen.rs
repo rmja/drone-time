@@ -55,6 +55,8 @@ pub trait NewGeneralCh4<Tim: GeneralTimMap, Int: IntToken> {
 impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
     UptimeAlarm<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
+    const MAX: u32 = 0xFFFF;
+
     fn start(&self) {
         self.tim.tim_cr1.modify_reg(|r, v| {
             r.udis().clear(v); // Enable counter overflow event generation
@@ -78,10 +80,6 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
 
     fn counter(&self) -> u32 {
         self.tim.tim_cnt.cnt().read_bits() as u32
-    }
-
-    fn counter_max() -> u32 {
-        0xFFFF
     }
 
     fn is_pending_overflow(&self) -> bool {

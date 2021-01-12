@@ -1,19 +1,17 @@
 /// The alarm backing Uptime.
 /// The timer must be monotonically increasing in the interval 0 <= counter() <= counter_max().
 pub trait UptimeAlarm<A>: Sync {
+    /// The maximum counter value.
+    const MAX: u32;
+
+    /// The timer period.
+    const PERIOD: u64 = Self::MAX as u64 + 1;
+
     /// Start the timer.
     fn start(&self);
 
     /// Get the current counter value of the timer.
     fn counter(&self) -> u32;
-
-    /// Get the maximum counter value.
-    fn counter_max() -> u32;
-
-    /// Get the timer period.
-    fn overflow_increment() -> u64 {
-        Self::counter_max() as u64 + 1
-    }
 
     /// Get whether the timer has overflowed.
     fn is_pending_overflow(&self) -> bool;

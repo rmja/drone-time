@@ -78,14 +78,12 @@ pub mod tests {
     }
 
     impl UptimeAlarm<TestTick> for TestAlarm {
+        const MAX: u32 = 0xFFFF;
+
         fn start(&self) {}
 
         fn counter(&self) -> u32 {
             0
-        }
-
-        fn counter_max() -> u32 {
-            0xFFFF
         }
 
         fn is_pending_overflow(&self) -> bool {

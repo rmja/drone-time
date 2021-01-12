@@ -126,7 +126,7 @@ where
             let cnt2 = self.alarm.counter();
             if cnt1 <= cnt2 {
                 // There was no alarm wrap while `overflows` was obtained.
-                break overflows as u64 * Alarm::overflow_increment() + cnt2 as u64;
+                break overflows as u64 * Alarm::PERIOD + cnt2 as u64;
             } else {
                 // The underlying alarm wrapped, retry
             }

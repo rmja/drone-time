@@ -14,9 +14,11 @@ impl SysTickDrv {
 unsafe impl Sync for SysTickDrv {}
 
 impl UptimeAlarm<SysTickDrv> for SysTickDrv {
+    const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
+
     fn start(&self) {
         // Enable timer
-        self.0.stk_load.store(|r| r.write_reload(0xFF_FF_FF));
+        self.0.stk_load.store(|r| r.write_reload(0xFFFFFF));
 
         self.0.stk_ctrl.store(|r| {
             r.set_tickint() // Counting down to 0 triggers the SysTick interrupt
@@ -26,12 +28,7 @@ impl UptimeAlarm<SysTickDrv> for SysTickDrv {
 
     fn counter(&self) -> u32 {
         // SysTick counts down, but the returned counter value must count up.
-        0xFF_FF_FF - self.0.stk_val.load_bits() as u32
-    }
-
-    fn counter_max() -> u32 {
-        // SysTick is a 24 bit counter.
-        0xFF_FF_FF
+        0xFFFFFF - self.0.stk_val.load_bits() as u32
     }
 
     fn is_pending_overflow(&self) -> bool {
