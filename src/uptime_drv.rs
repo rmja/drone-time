@@ -17,8 +17,6 @@ pub struct UptimeDrv<T: Tick, Alarm: UptimeAlarm<A>, A> {
     /// The next value to use for `overflows`.
     overflows_next: AtomicU32,
     overflows_next_pending: AtomicBool,
-    /// The last seen counter value.
-    last_counter: AtomicU32,
     adapter: PhantomData<A>,
 }
 
@@ -26,9 +24,9 @@ unsafe impl<T: Tick, Alarm: UptimeAlarm<A>, A> Sync for UptimeDrv<T, Alarm, A> {
 
 impl<T, Alarm, A> UptimeDrv<T, Alarm, A>
 where
-    T: Tick + 'static + Send,
-    Alarm: UptimeAlarm<A> + 'static + Send,
-    A: 'static + Send,
+    T: Tick + Send + 'static,
+    Alarm: UptimeAlarm<A> + Send + 'static,
+    A: Send + 'static,
 {
     /// Start the uptime counter.
     pub fn start<TimerInt: ThrToken>(alarm: Alarm, timer_int: TimerInt, _tick: T) -> Arc<Self> {
@@ -41,7 +39,6 @@ where
             overflows: AtomicU32::new(0),
             overflows_next: AtomicU32::new(1),
             overflows_next_pending: AtomicBool::new(false),
-            last_counter: AtomicU32::new(counter_now),
             adapter: PhantomData,
         });
 
@@ -98,18 +95,18 @@ where
 
         overflows
     }
-
-    pub fn last_counter(&self) -> u32 {
-        self.last_counter.load(Ordering::Relaxed)
-    }
 }
 
 impl<T, Alarm, A> Uptime<T> for UptimeDrv<T, Alarm, A>
 where
-    T: Tick + 'static + Send,
-    Alarm: UptimeAlarm<A> + 'static + Send,
-    A: 'static + Send,
+    T: Tick + Send + 'static,
+    Alarm: UptimeAlarm<A> + Send + 'static,
+    A: Send + 'static,
 {
+    fn counter(&self) -> u32 {
+        self.alarm.counter()
+    }
+
     fn now(&self) -> TimeSpan<T> {
         // Two things can happen while invoking now()
         // * Any other thread can interrupt and maybe call now()
