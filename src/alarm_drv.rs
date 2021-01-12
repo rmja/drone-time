@@ -17,9 +17,9 @@ impl<Timer: AlarmTimer<A>, A: Send> AlarmDrv<Timer, A> {
     }
 
     fn counter_add(base: u32, duration: u32) -> u32 {
-        assert!(base <= Timer::counter_max());
-        assert!(duration <= Timer::counter_max());
-        ((base as u64 + duration as u64) % Timer::overflow_increment()) as u32
+        assert!(base <= Timer::MAX);
+        assert!(duration <= Timer::MAX);
+        ((base as u64 + duration as u64) % Timer::PERIOD) as u32
     }
 }
 
@@ -31,9 +31,9 @@ impl<Timer: AlarmTimer<A>, A: Send> Alarm for AlarmDrv<Timer, A> {
 
         // The maximum delay is half the counters increment.
         // This ensures that we can hit the actual fire time directly when the last timeout is setup.
-        let half_period = (Timer::overflow_increment() / 2) as u32;
+        let half_period = (Timer::PERIOD / 2) as u32;
 
-        while remaining >= Timer::overflow_increment() {
+        while remaining >= Timer::PERIOD {
             // We can setup the final time
             let compare = Self::counter_add(base, half_period);
             self.timer.next(compare);
@@ -65,17 +65,14 @@ pub mod tests {
 
     impl AlarmTimer<TestTimer> for TestTimer {
         type Stop = Self;
+        const MAX: u32 = 9;
 
         fn counter(&self) -> u32 {
             self.counter
         }
 
-        fn counter_max() -> u32 {
-            9
-        }
-
         fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
-            assert!(compare <= Self::counter_max());
+            assert!(compare <= Self::MAX);
             assert!(!self.running);
             self.compares.push(compare);
             self.running = true;
@@ -133,6 +130,7 @@ pub mod tests {
         assert_eq!(vec![9, 4, 9, 5], alarm.timer.compares);
     }
 
+    #[test]
     fn sleep_drop() {
         let timer = TestTimer {
             counter: 4,

@@ -8,16 +8,14 @@ pub trait AlarmTimer<A>: Send {
     /// AlarmTimer stop handler.
     type Stop: AlarmTimerStop;
 
+    /// The maximum counter value.
+    const MAX: u32;
+
+    /// The timer period.
+    const PERIOD: u64 = Self::MAX as u64 + 1;
+
     /// Get the current counter value of the timer.
     fn counter(&self) -> u32;
-
-    /// Get the maximum counter value.
-    fn counter_max() -> u32;
-
-    /// Get the timer period.
-    fn overflow_increment() -> u64 {
-        Self::counter_max() as u64 + 1
-    }
 
     /// Returns a future that resolves when the timer counter is equal to `compare`.
     /// Note that compare is not a duration but an absolute timestamp.

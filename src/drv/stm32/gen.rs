@@ -103,13 +103,10 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> +
     AlarmTimer<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
     type Stop = Self;
+    const MAX: u32 = 0xFFFF;
 
     fn counter(&self) -> u32 {
         self.tim.tim_cnt.cnt().read_bits() as u32
-    }
-
-    fn counter_max() -> u32 {
-        0xFFFF
     }
 
     fn next<'a>(&'a mut self, compare: u32) -> AlarmTimerNext<'a, Self::Stop> {
