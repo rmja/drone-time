@@ -1,4 +1,4 @@
-use core::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, task::{Context, Poll, Waker}};
+use core::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, sync::atomic::{AtomicBool, Ordering}, task::{Context, Poll, Waker}};
 
 use crate::{AlarmTimer, Tick, TimeSpan};
 use alloc::{collections::VecDeque, rc::Rc, sync::Arc};
@@ -8,7 +8,7 @@ use futures::prelude::*;
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
     timer: Timer,
-    subscriptions: VecDeque<Arc<Mutex<Box<Subscription<T>>>>>,
+    subscriptions: Arc<Mutex<VecDeque<Arc<SubscriptionState<T>>>>>,
     // state: Arc<Mutex<State<T, A>>>,
     tick: PhantomData<T>,
     adapter: PhantomData<A>,
@@ -19,14 +19,15 @@ pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
 //     adapter: PhantomData<A>,
 // }
 
-pub struct Subscription<T: Tick>  {
+pub struct SubscriptionState<T: Tick>  {
     remaining: TimeSpan<T>,
-    waker: Option<Waker>,
+    dropped: AtomicBool,
+    waker: Mutex<Option<Waker>>,
 }
 
 pub struct SubscriptionGuard<T: Tick> {
-    // subscriptions: Option<&'a RefCell<VecDeque<Arc<Mutex<Box<Subscription<T>>>>>>>,
-    inner: Arc<Mutex<Box<Subscription<T>>>>,
+    subscriptions: Arc<Mutex<VecDeque<Arc<SubscriptionState<T>>>>>,
+    inner: Arc<SubscriptionState<T>>,
     tick: PhantomData<T>,
 }
 
@@ -37,14 +38,22 @@ impl<T: Tick + 'static> Future for SubscriptionGuard<T> {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
-        let mut inner = self.inner.try_lock().unwrap();
-        if inner.remaining.0 == 0 {
-            // Timeout has already occured.
-            Poll::Ready(())
+        let waker = self.inner.waker.try_lock();
+        if let Some(mut waker) = waker {
+            let inner = self.inner.clone();
+            if inner.remaining.0 == 0 {
+                // Timeout has already occured.
+                Poll::Ready(())
+            }
+            else {
+                // Copy the waker to the subscription so that we can wake it when it is time.
+                *waker = Some(cx.waker().clone());
+                Poll::Pending
+            }
         }
         else {
-            // Copy the waker to the subscription so that we can wake it when it is time.
-            inner.waker = Some(cx.waker().clone());
+            // Wake immediately to retry lock.
+            cx.waker().clone().wake();
             Poll::Pending
         }
     }
@@ -52,9 +61,7 @@ impl<T: Tick + 'static> Future for SubscriptionGuard<T> {
 
 impl<T: Tick> Drop for SubscriptionGuard<T> {
     fn drop(&mut self) {
-        // let subs = self.inner.subscriptions.unwrap().borrow_mut();
-        // let index = subs.into_iter().position(|x| core::ptr::eq(x, self)).unwrap();
-        // subs.remove(index);
+        self.inner.dropped.store(true, Ordering::Release);
     }
 }
 
@@ -65,7 +72,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
     pub fn new(timer: Timer) -> Self {
         Self {
             timer,
-            subscriptions: VecDeque::new(),
+            subscriptions: Arc::new(Mutex::new(VecDeque::new())),
             tick: PhantomData,
             adapter: PhantomData,
             // state: Arc::new(Mutex::new(State {
@@ -89,32 +96,30 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
         let index = 2;
-        let sub = Arc::new(Mutex::new(Box::new(Subscription {
+        let sub = Arc::new(SubscriptionState {
             remaining: duration,
-            waker: None,
-        })));
+            dropped: AtomicBool::new(false),
+            waker: Mutex::new(None),
+        });
 
-        let index = Self::get_insert_index(&self.subscriptions, duration);
-        self.subscriptions.insert(index, sub.clone());
-
-        // let subs = self.subscriptions;
-        // sub.subscriptions = Some(&subs);
+        let index = self.get_insert_index(duration);
+        self.subscriptions.try_lock().unwrap().insert(index, sub.clone());
 
         // if index == 0 {
         //     self.set_running(base, duration);
         // }
 
         SubscriptionGuard {
-            // subscriptions: Some(&self.subscriptions),
+            subscriptions: self.subscriptions.clone(),
             inner: sub,
             tick: PhantomData,
         }
     }
 
-    fn get_insert_index(subscriptions: &VecDeque<Arc<Mutex<Box<Subscription<T>>>>>, remaining: TimeSpan<T>) -> usize {
+    fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
         let mut index = 0;
-        for sub in subscriptions.iter() {
-            if remaining < sub.try_lock().unwrap().remaining {
+        for sub in self.subscriptions.try_lock().unwrap().iter() {
+            if remaining < sub.remaining {
                 break;
             }
             index += 1;
