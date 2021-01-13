@@ -1,4 +1,11 @@
-use core::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, sync::atomic::{AtomicBool, Ordering}, task::{Context, Poll, Waker}};
+use core::{
+    cell::RefCell,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::atomic::{AtomicBool, Ordering},
+    task::{Context, Poll, Waker},
+};
 
 use crate::{AlarmTimer, Tick, TimeSpan};
 use alloc::{collections::VecDeque, rc::Rc, sync::Arc};
@@ -19,7 +26,7 @@ pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
 //     adapter: PhantomData<A>,
 // }
 
-pub struct SubscriptionState<T: Tick>  {
+pub struct SubscriptionState<T: Tick> {
     remaining: TimeSpan<T>,
     dropped: AtomicBool,
     waker: Mutex<Option<Waker>>,
@@ -33,25 +40,21 @@ pub struct SubscriptionGuard<T: Tick> {
 impl<T: Tick + 'static> Future for SubscriptionGuard<T> {
     type Output = ();
 
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let waker = self.inner.waker.try_lock();
         if let Some(mut waker) = waker {
             let inner = self.inner.clone();
             if inner.remaining.0 == 0 {
                 // Timeout has already occured.
                 Poll::Ready(())
-            }
-            else {
+            } else {
                 // Copy the waker to the subscription so that we can wake it when it is time.
                 *waker = Some(cx.waker().clone());
                 Poll::Pending
             }
-        }
-        else {
+        } else {
             // Wake immediately to retry lock.
+            // The thread is yield so that any other thread that currently has the lock gets a chance to release.
             cx.waker().clone().wake();
             Poll::Pending
         }
@@ -82,7 +85,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
         }
     }
 
-    /// Get the current counter value of the 
+    /// Get the current counter value of the
     pub fn counter(&self) -> u32 {
         self.timer.counter()
     }
@@ -94,24 +97,30 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
 
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
-        let index = 2;
         let sub = Arc::new(SubscriptionState {
             remaining: duration,
             dropped: AtomicBool::new(false),
             waker: Mutex::new(None),
         });
 
+        self.remove_dropped_subscriptions();
+
         let index = self.get_insert_index(duration);
         self.subscriptions.insert(index, sub.clone());
 
-        // if index == 0 {
-        //     self.set_running(base, duration);
-        // }
+        if index == 0 {
+            // self.set_running(base, duration);
+        }
 
         SubscriptionGuard {
             inner: sub,
             tick: PhantomData,
         }
+    }
+
+    fn remove_dropped_subscriptions(&mut self) {
+        self.subscriptions
+            .retain(|x| !x.dropped.load(Ordering::Acquire));
     }
 
     fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
@@ -126,31 +135,31 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
     }
 
     // fn set_running(&mut self, base: u32, duration: TimeSpan<T>) {
-    //     let state = self.state.clone();
+    //     // let state = self.state.clone();
     //     let future = self.sleep_timer(base, duration).then(move |f| {
-    //         let mut state = state.try_lock().unwrap();
-    //         // Set the remaining time for each subscription.
-    //         for s in state.subscriptions.iter_mut() {
-    //             s.remaining -= duration;
+    //         // let mut state = state.try_lock().unwrap();
+    //         // // Set the remaining time for each subscription.
+    //         // for s in state.subscriptions.iter_mut() {
+    //         //     s.remaining -= duration;
 
-    //             if s.remaining.0 == 0 {
-    //                 state.subscriptions.pop_front();
+    //         //     if s.remaining.0 == 0 {
+    //         //         state.subscriptions.pop_front();
 
-    //                 // Wake the future for the subscription.
-    //                 s.waker.unwrap().wake();
-    //             }
-    //         }
+    //         //         // Wake the future for the subscription.
+    //         //         s.waker.unwrap().wake();
+    //         //     }
+    //         // }
 
-    //         let next = state.subscriptions.front();
-    //         if let Some(next) = next {
-    //             let base = Self::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
-    //             // self.set_running(base, next.remaining);
-    //         }
+    //         // let next = state.subscriptions.front();
+    //         // if let Some(next) = next {
+    //         //     let base = Self::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
+    //         //     // self.set_running(base, next.remaining);
+    //         // }
 
     //         future::ready(())
     //     });
 
-    //     // self.running = Some(Box::pin(future));
+    //     self.running = Some(Box::pin(future));
     // }
 
     fn counter_add(base: u32, duration: u32) -> u32 {
