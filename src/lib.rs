@@ -7,6 +7,7 @@ extern crate alloc;
 
 mod adapters;
 mod alarm;
+mod atomic_option_box;
 mod datetime;
 pub mod drv;
 mod timespan;
