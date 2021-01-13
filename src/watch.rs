@@ -138,20 +138,20 @@ pub mod tests {
         assert!(now.is_err());
 
         let set_datetime = DateTime::new(2021, Month::January, 8, 10, 39, 27);
-        let set_upstamp = TimeSpan::from_seconds(100);
+        let set_upstamp = TimeSpan::from_secs(100);
         watch.set(set_datetime, set_upstamp);
 
         assert_eq!(
-            set_datetime - TimeSpan::<TestTick>::from_seconds(1),
+            set_datetime - TimeSpan::<TestTick>::from_secs(1),
             watch
-                .at(set_upstamp - TimeSpan::<TestTick>::from_seconds(1))
+                .at(set_upstamp - TimeSpan::<TestTick>::from_secs(1))
                 .unwrap()
         );
         assert_eq!(set_datetime, watch.at(set_upstamp).unwrap());
         assert_eq!(
-            set_datetime + TimeSpan::<TestTick>::from_seconds(1),
+            set_datetime + TimeSpan::<TestTick>::from_secs(1),
             watch
-                .at(set_upstamp + TimeSpan::<TestTick>::from_seconds(1))
+                .at(set_upstamp + TimeSpan::<TestTick>::from_secs(1))
                 .unwrap()
         );
     }

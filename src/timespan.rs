@@ -20,57 +20,57 @@ impl<T: Tick> Clone for TimeSpan<T> {
 pub struct TimeSpanParts {
     pub days: u16,
     pub hours: u16,
-    pub minutes: u8,
-    pub seconds: u8,
-    pub milliseconds: u16,
+    pub mins: u8,
+    pub secs: u8,
+    pub millis: u16,
 }
 
 impl<T: Tick> TimeSpan<T> {
     pub const ZERO: Self = Self(0, PhantomData);
-    const MAX_SECONDS: u32 = u32::MAX;
-    const MAX_MILLISECONDS: u64 = Self::MAX_SECONDS as u64 * 1000;
-    const MAX_DAYS: u16 = (Self::MAX_SECONDS / 60 / 60 / 24) as u16;
+    const MAX_secs: u32 = u32::MAX;
+    const MAX_millis: u64 = Self::MAX_secs as u64 * 1000;
+    const MAX_DAYS: u16 = (Self::MAX_secs / 60 / 60 / 24) as u16;
     const TICKS_PER_SECOND: u64 = T::FREQ as u64;
     const TICKS_PER_MINUTE: u64 = Self::TICKS_PER_SECOND * 60;
     const TICKS_PER_HOUR: u64 = Self::TICKS_PER_MINUTE * 60;
     const TICKS_PER_DAY: u64 = Self::TICKS_PER_HOUR * 24;
 
-    pub fn new(hours: u16, minutes: u8, seconds: u8) -> Self {
+    pub fn new(hours: u16, mins: u8, secs: u8) -> Self {
         Self::from_parts(TimeSpanParts {
             days: 0,
             hours,
-            minutes,
-            seconds,
-            milliseconds: 0,
+            mins,
+            secs,
+            millis: 0,
         })
     }
 
     pub fn from_parts(parts: TimeSpanParts) -> Self {
         assert!(parts.days <= Self::MAX_DAYS);
         assert!(parts.hours < 24);
-        assert!(parts.minutes < 60);
-        assert!(parts.seconds < 60);
-        assert!(parts.milliseconds < 1000);
+        assert!(parts.mins < 60);
+        assert!(parts.secs < 60);
+        assert!(parts.millis < 1000);
 
         let ticks = parts.days as u64 * Self::TICKS_PER_DAY
             + parts.hours as u64 * Self::TICKS_PER_HOUR
-            + parts.minutes as u64 * Self::TICKS_PER_MINUTE
-            + parts.seconds as u64 * Self::TICKS_PER_SECOND
-            + (parts.milliseconds as u64 * Self::TICKS_PER_SECOND) / 1000;
+            + parts.mins as u64 * Self::TICKS_PER_MINUTE
+            + parts.secs as u64 * Self::TICKS_PER_SECOND
+            + (parts.millis as u64 * Self::TICKS_PER_SECOND) / 1000;
         Self::from_ticks(ticks)
     }
 
-    pub fn from_seconds(seconds: u32) -> Self {
-        Self::from_ticks(seconds as u64 * Self::TICKS_PER_SECOND)
+    pub fn from_secs(secs: u32) -> Self {
+        Self::from_ticks(secs as u64 * Self::TICKS_PER_SECOND)
     }
 
-    pub fn from_milliseconds(milliseconds: u64) -> Self {
-        assert!(milliseconds <= Self::MAX_MILLISECONDS);
+    pub fn from_millis(millis: u64) -> Self {
+        assert!(millis <= Self::MAX_millis);
 
-        let seconds = milliseconds / 1000;
-        let sub_seconds = milliseconds - seconds * 1000;
+        let secs = millis / 1000;
+        let sub_secs = millis - secs * 1000;
         let ticks =
-            seconds * Self::TICKS_PER_SECOND + (sub_seconds * 1000 * Self::TICKS_PER_SECOND) / 1000;
+            secs * Self::TICKS_PER_SECOND + (sub_secs * 1000 * Self::TICKS_PER_SECOND) / 1000;
         Self::from_ticks(ticks)
     }
 
@@ -87,33 +87,33 @@ impl<T: Tick> TimeSpan<T> {
         let hours = ticks / Self::TICKS_PER_HOUR;
         ticks -= hours * Self::TICKS_PER_HOUR;
 
-        let minutes = ticks / Self::TICKS_PER_MINUTE;
-        ticks -= minutes * Self::TICKS_PER_MINUTE;
+        let mins = ticks / Self::TICKS_PER_MINUTE;
+        ticks -= mins * Self::TICKS_PER_MINUTE;
 
-        let seconds = ticks / Self::TICKS_PER_SECOND;
-        ticks -= seconds * Self::TICKS_PER_SECOND;
+        let secs = ticks / Self::TICKS_PER_SECOND;
+        ticks -= secs * Self::TICKS_PER_SECOND;
 
         // Round to nearest.
-        let milliseconds = (ticks * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND;
+        let millis = (ticks * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND;
 
         TimeSpanParts {
             days: days as u16,
             hours: hours as u16,
-            minutes: minutes as u8,
-            seconds: seconds as u8,
-            milliseconds: milliseconds as u16,
+            mins: mins as u8,
+            secs: secs as u8,
+            millis: millis as u16,
         }
     }
 
-    pub fn total_seconds(&self) -> u32 {
+    pub fn total_secs(&self) -> u32 {
         (self.0 / Self::TICKS_PER_SECOND) as u32
     }
 
-    pub fn total_milliseconds(&self) -> u64 {
-        let seconds = self.total_seconds() as u64;
-        let sub_seconds = self.0 - seconds * Self::TICKS_PER_SECOND;
+    pub fn total_millis(&self) -> u64 {
+        let secs = self.total_secs() as u64;
+        let sub_secs = self.0 - secs * Self::TICKS_PER_SECOND;
         // Round to nearest.
-        seconds * 1000 + (sub_seconds * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND
+        secs * 1000 + (sub_secs * 1000 + Self::TICKS_PER_SECOND / 2) / Self::TICKS_PER_SECOND
     }
 }
 
@@ -163,7 +163,7 @@ impl<T: Tick> Debug for TimeSpan<T> {
         write!(
             f,
             "{}d{:02}:{:02}:{:02}.{:03}",
-            parts.days, parts.hours, parts.minutes, parts.seconds, parts.milliseconds
+            parts.days, parts.hours, parts.mins, parts.secs, parts.millis
         )
     }
 }
@@ -183,9 +183,9 @@ pub mod tests {
         let ts = TimeSpan::<TestTick>::from_parts(TimeSpanParts {
             days: 1,
             hours: 2,
-            minutes: 3,
-            seconds: 4,
-            milliseconds: 5,
+            mins: 3,
+            secs: 4,
+            millis: 5,
         });
         let parts = ts.parts();
 
@@ -195,37 +195,37 @@ pub mod tests {
         );
         assert_eq!(1, parts.days);
         assert_eq!(2, parts.hours);
-        assert_eq!(3, parts.minutes);
-        assert_eq!(4, parts.seconds);
-        assert_eq!(5, parts.milliseconds);
+        assert_eq!(3, parts.mins);
+        assert_eq!(4, parts.secs);
+        assert_eq!(5, parts.millis);
     }
 
     #[test]
-    fn total_seconds() {
-        let seconds = TimeSpan::<TestTick>::from_parts(TimeSpanParts {
+    fn total_secs() {
+        let secs = TimeSpan::<TestTick>::from_parts(TimeSpanParts {
             days: 1,
             hours: 2,
-            minutes: 3,
-            seconds: 4,
-            milliseconds: 5,
+            mins: 3,
+            secs: 4,
+            millis: 5,
         })
-        .total_seconds();
-        assert_eq!(1 * 86400 + 2 * 3600 + 3 * 60 + 4, seconds);
+        .total_secs();
+        assert_eq!(1 * 86400 + 2 * 3600 + 3 * 60 + 4, secs);
     }
 
     #[test]
-    fn total_milliseconds() {
-        let milliseconds = TimeSpan::<TestTick>::from_parts(TimeSpanParts {
+    fn total_millis() {
+        let millis = TimeSpan::<TestTick>::from_parts(TimeSpanParts {
             days: 1,
             hours: 2,
-            minutes: 3,
-            seconds: 4,
-            milliseconds: 5,
+            mins: 3,
+            secs: 4,
+            millis: 5,
         })
-        .total_milliseconds();
+        .total_millis();
         assert_eq!(
             1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5,
-            milliseconds
+            millis
         );
     }
 }
