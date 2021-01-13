@@ -160,7 +160,7 @@ impl<T: Tick> Add<TimeSpan<T>> for DateTime {
     type Output = DateTime;
 
     fn add(self, rhs: TimeSpan<T>) -> Self::Output {
-        DateTime(self.0 + rhs.total_secs())
+        DateTime(self.0 + rhs.as_secs())
     }
 }
 
@@ -168,7 +168,7 @@ impl<T: Tick> Sub<TimeSpan<T>> for DateTime {
     type Output = DateTime;
 
     fn sub(self, rhs: TimeSpan<T>) -> Self::Output {
-        DateTime(self.0 - rhs.total_secs())
+        DateTime(self.0 - rhs.as_secs())
     }
 }
 
