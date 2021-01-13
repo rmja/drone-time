@@ -8,7 +8,7 @@ use futures::prelude::*;
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
     timer: Timer,
-    subscriptions: Arc<Mutex<VecDeque<Arc<SubscriptionState<T>>>>>,
+    subscriptions: VecDeque<Arc<SubscriptionState<T>>>,
     // state: Arc<Mutex<State<T, A>>>,
     tick: PhantomData<T>,
     adapter: PhantomData<A>,
@@ -26,7 +26,6 @@ pub struct SubscriptionState<T: Tick>  {
 }
 
 pub struct SubscriptionGuard<T: Tick> {
-    subscriptions: Arc<Mutex<VecDeque<Arc<SubscriptionState<T>>>>>,
     inner: Arc<SubscriptionState<T>>,
     tick: PhantomData<T>,
 }
@@ -72,7 +71,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
     pub fn new(timer: Timer) -> Self {
         Self {
             timer,
-            subscriptions: Arc::new(Mutex::new(VecDeque::new())),
+            subscriptions: VecDeque::new(),
             tick: PhantomData,
             adapter: PhantomData,
             // state: Arc::new(Mutex::new(State {
@@ -103,14 +102,13 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
         });
 
         let index = self.get_insert_index(duration);
-        self.subscriptions.try_lock().unwrap().insert(index, sub.clone());
+        self.subscriptions.insert(index, sub.clone());
 
         // if index == 0 {
         //     self.set_running(base, duration);
         // }
 
         SubscriptionGuard {
-            subscriptions: self.subscriptions.clone(),
             inner: sub,
             tick: PhantomData,
         }
@@ -118,7 +116,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
 
     fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
         let mut index = 0;
-        for sub in self.subscriptions.try_lock().unwrap().iter() {
+        for sub in self.subscriptions.iter() {
             if remaining < sub.remaining {
                 break;
             }
