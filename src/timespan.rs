@@ -1,7 +1,7 @@
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    ops::{Add, Sub},
+    ops::{Add, AddAssign, Sub, SubAssign},
 };
 
 use crate::Tick;
@@ -156,11 +156,23 @@ impl<T: Tick> Add for TimeSpan<T> {
     }
 }
 
+impl<T: Tick> AddAssign for TimeSpan<T> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
 impl<T: Tick> Sub for TimeSpan<T> {
     type Output = TimeSpan<T>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         TimeSpan::from_ticks(self.0 - rhs.0)
+    }
+}
+
+impl<T: Tick> SubAssign for TimeSpan<T> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
     }
 }
 
