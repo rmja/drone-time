@@ -33,6 +33,7 @@ impl Future for SubscriptionFuture {
 impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<Timer, T, A> {
     pub const MAX: u32 = Timer::MAX;
 
+    /// Create a new `Alarm` backed by a hardware timer.
     pub fn new(timer: Timer) -> Self {
         Self {
             timer,
@@ -42,25 +43,29 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<Timer, T, A> {
         }
     }
 
+    /// Get the current counter value of the 
     pub fn counter(&self) -> u32 {
         self.timer.counter()
     }
 
+    /// Get a future that completes after a delay of length `duration`.
     pub fn sleep(&mut self, duration: TimeSpan<T>) -> impl Future<Output = ()> {
         self.sleep_from(self.counter(), duration)
     }
 
+    /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
         let sub = Subscription {
             remaining: duration,
         };
+        
         let mut subscriptions = self.subscriptions.try_lock().unwrap();
         let index = Self::get_insert_index(&subscriptions, duration);
         subscriptions.insert(index, sub);
+        drop(subscriptions);
 
         if index == 0 {
-            let a = subscriptions.front().unwrap();
-            // self.set_running(base, a);
+            self.set_running(base, duration);
         }
 
         SubscriptionFuture
@@ -77,15 +82,13 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<Timer, T, A> {
         index
     }
 
-    fn set_running(&mut self, base: u32, sub: &Subscription<T>) {
-        let remaining = sub.remaining;
-
+    fn set_running(&mut self, base: u32, duration: TimeSpan<T>) {
         let subs = self.subscriptions.clone();
-        let future = self.sleep_timer(base, remaining).then(move |f| {
+        let future = self.sleep_timer(base, duration).then(move |f| {
             let mut subs = subs.try_lock().unwrap();
             // Set the remaining time for each subscription.
             for s in subs.iter_mut() {
-                s.remaining -= remaining;
+                s.remaining -= duration;
             }
 
             // Wake all futures for subscriptions with remaining == 0.
@@ -102,7 +105,8 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<Timer, T, A> {
 
             let next = subs.front();
             if let Some(next) = next {
-                // self.set_running(next)
+                let base = Self::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
+                // self.set_running(base, next.remaining);
             }
 
             future::ready(())
