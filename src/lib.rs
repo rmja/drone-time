@@ -7,10 +7,8 @@ extern crate alloc;
 
 mod adapters;
 mod alarm;
-mod alarm_drv;
 mod datetime;
 pub mod drv;
-mod sharedalarm;
 mod timespan;
 mod uptime;
 mod uptime_drv;
@@ -21,7 +19,6 @@ pub use self::{
     adapters::tick::Tick,
     adapters::uptime::UptimeAlarm,
     alarm::Alarm,
-    alarm_drv::AlarmDrv,
     datetime::{DateTime, Month},
     timespan::TimeSpan,
     uptime::Uptime,
