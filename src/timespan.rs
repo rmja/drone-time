@@ -73,8 +73,7 @@ impl<T: Tick> TimeSpan<T> {
 
         let secs = millis / 1000;
         let sub_secs = millis - secs * 1000;
-        let ticks =
-            secs * Self::TICKS_PER_SEC + (sub_secs * 1000 * Self::TICKS_PER_SEC) / 1000;
+        let ticks = secs * Self::TICKS_PER_SEC + (sub_secs * 1000 * Self::TICKS_PER_SEC) / 1000;
         Self::from_ticks(ticks)
     }
 

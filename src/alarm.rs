@@ -30,8 +30,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A: Send> Alarm<Timer, T, A> {
         ((base as u64 + duration as u64) % Timer::PERIOD) as u32
     }
 
-    async fn sleep_from(&mut self, mut base: u32, duration: TimeSpan<T>)
-    {
+    async fn sleep_from(&mut self, mut base: u32, duration: TimeSpan<T>) {
         let mut remaining = duration.0;
 
         // The maximum delay is half the counters increment.
@@ -71,7 +70,9 @@ pub mod tests {
         };
         let mut alarm = Alarm::new(timer);
 
-        alarm.sleep_from(alarm.counter(), TimeSpan::from_ticks(9)).await;
+        alarm
+            .sleep_from(alarm.counter(), TimeSpan::from_ticks(9))
+            .await;
 
         assert_eq!(vec![3], alarm.timer.compares);
     }
@@ -85,7 +86,9 @@ pub mod tests {
         };
         let mut alarm = Alarm::new(timer);
 
-        alarm.sleep_from(alarm.counter(), TimeSpan::from_ticks(10)).await;
+        alarm
+            .sleep_from(alarm.counter(), TimeSpan::from_ticks(10))
+            .await;
 
         assert_eq!(vec![9, 4], alarm.timer.compares);
     }
@@ -99,7 +102,9 @@ pub mod tests {
         };
         let mut alarm = Alarm::new(timer);
 
-        alarm.sleep_from(alarm.counter(), TimeSpan::from_ticks(21)).await;
+        alarm
+            .sleep_from(alarm.counter(), TimeSpan::from_ticks(21))
+            .await;
 
         assert_eq!(vec![9, 4, 9, 5], alarm.timer.compares);
     }
