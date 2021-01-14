@@ -1,6 +1,15 @@
-use core::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, sync::atomic::{AtomicUsize, Ordering}, task::{Context, Poll, Waker}};
+use core::{
+    cell::RefCell,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll, Waker},
+};
 
-use crate::{AlarmTimer, Tick, TimeSpan, atomic_box::AtomicBox, atomic_option_box::AtomicOptionBox};
+use crate::{
+    atomic_box::AtomicBox, atomic_option_box::AtomicOptionBox, AlarmTimer, Tick, TimeSpan,
+};
 use alloc::{collections::VecDeque, sync::Arc};
 use drone_core::sync::Mutex;
 use futures::prelude::*;
@@ -54,8 +63,7 @@ impl Future for SubscriptionGuard {
             inner.waker.take(Ordering::AcqRel);
             inner.state.store(COMPLETED, Ordering::Release);
             Poll::Ready(())
-        }
-        else {
+        } else {
             Poll::Pending
         }
     }
@@ -109,7 +117,8 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
         shared.remove_dropped();
         shared.subscriptions.insert(index, sub);
         if index == 0 {
-            let future = SharedState::create_running(&mut shared.timer, self.state.clone(), base, duration);
+            let future =
+                SharedState::create_running(&mut shared.timer, self.state.clone(), base, duration);
             // shared.running = Some(Box::pin(future));
         }
 
@@ -118,37 +127,48 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 }
 
 impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, T, A> {
-    async fn create_running(timer: &mut RefCell<Timer>, arc: Arc<Mutex<SharedState<Timer, T, A>>>, base: u32, duration: TimeSpan<T>) {
+    async fn create_running(
+        timer: &mut RefCell<Timer>,
+        arc: Arc<Mutex<SharedState<Timer, T, A>>>,
+        base: u32,
+        duration: TimeSpan<T>,
+    ) {
         let mut timer = timer.borrow_mut();
-        timer.sleep(base, duration).then(move |_| {
-            let mut shared = arc.try_lock().unwrap();
+        timer
+            .sleep(base, duration)
+            .then(move |_| {
+                let mut shared = arc.try_lock().unwrap();
 
-            shared.remove_dropped();
+                shared.remove_dropped();
 
-            // Set the remaining time for each subscription.
-            for s in shared.subscriptions.iter_mut() {
-                s.remaining -= duration;
+                // Set the remaining time for each subscription.
+                for s in shared.subscriptions.iter_mut() {
+                    s.remaining -= duration;
 
-                if s.remaining.0 == 0 {
-                    // Wake the future for the subscription.
-                    let old = s.inner.state.compare_and_swap(WAKEABLE, COMPLETED, Ordering::AcqRel);
-                    if old == WAKEABLE {
-                        let waker = s.inner.waker.take(Ordering::AcqRel).unwrap();
-                        waker.wake();
+                    if s.remaining.0 == 0 {
+                        // Wake the future for the subscription.
+                        let old =
+                            s.inner
+                                .state
+                                .compare_and_swap(WAKEABLE, COMPLETED, Ordering::AcqRel);
+                        if old == WAKEABLE {
+                            let waker = s.inner.waker.take(Ordering::AcqRel).unwrap();
+                            waker.wake();
+                        }
                     }
                 }
-            }
 
-            shared.subscriptions.retain(|x| x.remaining.0 > 0);
+                shared.subscriptions.retain(|x| x.remaining.0 > 0);
 
-            if let Some(next) = shared.subscriptions.front() {
-                let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
-                let duration = next.remaining;
-                // shared.running = Some(shared.create_running(arc.clone(), base, duration));
-            }
+                if let Some(next) = shared.subscriptions.front() {
+                    let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
+                    let duration = next.remaining;
+                    // shared.running = Some(shared.create_running(arc.clone(), base, duration));
+                }
 
-            future::ready(())
-        }).await;
+                future::ready(())
+            })
+            .await;
     }
 
     fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {

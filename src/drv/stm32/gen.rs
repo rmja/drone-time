@@ -97,8 +97,12 @@ impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
     }
 }
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim> + Send + 'static, T: Tick + 'static>
-    AlarmTimer<T, GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
+impl<
+        Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms,
+        Int: IntToken,
+        Ch: TimCh<Tim> + Send + 'static,
+        T: Tick + 'static,
+    > AlarmTimer<T, GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
     type Stop = Self;
     const MAX: u32 = 0xFFFF;
