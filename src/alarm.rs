@@ -19,7 +19,7 @@ pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
 }
 
 struct SharedState<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
-    running: Option<Pin<Box<dyn Future<Output = ()>>>>,
+    future: Option<Pin<Box<dyn Future<Output = ()>>>>,
     subscriptions: VecDeque<Subscription<T>>,
     adapter: PhantomData<A>,
     timer: PhantomData<Timer>,
@@ -81,7 +81,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
         Self {
             timer: Arc::new(RefCell::new(timer)),
             state: Arc::new(Mutex::new(SharedState {
-                running: None,
+                future: None,
                 subscriptions: VecDeque::new(),
                 adapter: PhantomData,
                 timer: PhantomData,
@@ -117,14 +117,14 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
         shared.subscriptions.insert(index, sub);
         if index == 0 {
             let future =
-                Self::create_running(self.timer.clone(), self.state.clone(), base, duration);
-            shared.running = Some(Box::pin(future));
+                Self::create_future(self.timer.clone(), self.state.clone(), base, duration);
+            shared.future = Some(Box::pin(future));
         }
 
         SubscriptionGuard { inner: sub_state }
     }
 
-    async fn create_running(
+    async fn create_future(
         timer: Arc<RefCell<Timer>>,
         state: Arc<Mutex<SharedState<Timer, T, A>>>,
         base: u32,
@@ -132,8 +132,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
     ) {
         let mut t = timer.borrow_mut();
         let timer = timer.clone();
-        t
-            .sleep(base, duration)
+        t.sleep(base, duration)
             .then(move |_| {
                 let mut shared = state.try_lock().unwrap();
 
@@ -161,9 +160,10 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
                 if let Some(next) = shared.subscriptions.front() {
                     let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
-                    let future =
-                        Self::create_running(timer, state.clone(), base, duration);
-                    shared.running = Some(Box::pin(future));
+                    let future = Self::create_future(timer, state.clone(), base, duration);
+                    shared.future = Some(Box::pin(future));
+                } else {
+                    shared.future = None;
                 }
 
                 future::ready(())
