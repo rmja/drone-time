@@ -46,6 +46,10 @@ impl<T: Tick> TimeSpan<T> {
         })
     }
 
+    pub fn infinite() -> Self {
+        Self(u64::MAX, PhantomData)
+    }
+
     /// Create a new `TimeSpan` from individual components.
     pub fn from_parts(parts: TimeSpanParts) -> Self {
         assert!(parts.days <= Self::MAX_DAYS);
@@ -82,8 +86,14 @@ impl<T: Tick> TimeSpan<T> {
         Self(ticks, PhantomData)
     }
 
+    pub fn is_infinite(&self) -> bool {
+        self.0 == u64::MAX
+    }
+
     /// Get the individual components of a `TimeSpan`.
     pub fn parts(&self) -> TimeSpanParts {
+        assert!(!self.is_infinite());
+
         let mut ticks = self.0;
 
         let days = ticks / Self::TICKS_PER_DAY;
@@ -112,11 +122,15 @@ impl<T: Tick> TimeSpan<T> {
 
     /// Get the number of _whole_ seconds in the `TimeSpan`.
     pub fn as_secs(&self) -> u32 {
+        assert!(!self.is_infinite());
+
         (self.0 / Self::TICKS_PER_SEC) as u32
     }
 
     /// Get the number of _whole_ milliseconds in the `TimeSpan`.
     pub fn as_millis(&self) -> u64 {
+        assert!(!self.is_infinite());
+
         let secs = self.as_secs() as u64;
         let sub_secs = self.0 - secs * Self::TICKS_PER_SEC;
         // Round to nearest.
