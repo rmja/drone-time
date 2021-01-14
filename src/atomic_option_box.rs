@@ -5,7 +5,7 @@ use core::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-/// A `Sync` `Option<Box<T>>`.
+/// An atomic `Option<Box<T>>`.
 pub struct AtomicOptionBox<T> {
     inner: AtomicPtr<T>,
 }
@@ -24,7 +24,6 @@ impl<T> AtomicOptionBox<T> {
 
     /// Create a new `AtomicOptionBox` with the `None` value, useful for static variables.
     pub const fn none() -> AtomicOptionBox<T> {
-        let x = Option::Some(2);
         AtomicOptionBox {
             inner: AtomicPtr::new(ptr::null_mut()),
         }
