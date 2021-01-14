@@ -1,4 +1,4 @@
-use core::{future::Future, marker::PhantomData, pin::Pin, sync::atomic::{AtomicUsize, Ordering}, task::{Context, Poll, Waker}};
+use core::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, sync::atomic::{AtomicUsize, Ordering}, task::{Context, Poll, Waker}};
 
 use crate::{AlarmTimer, Tick, TimeSpan, atomic_box::AtomicBox, atomic_option_box::AtomicOptionBox};
 use alloc::{collections::VecDeque, sync::Arc};
@@ -7,20 +7,19 @@ use futures::prelude::*;
 
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
-    timer: Timer,
-    state: Arc<Mutex<State<T>>>,
-    tick: PhantomData<T>,
-    adapter: PhantomData<A>,
+    state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
-struct State<T: Tick> {
+struct SharedState<Timer: AlarmTimer<T, A>, T: Tick, A> {
+    timer: Timer,
     running: Option<Pin<Box<dyn Future<Output = ()>>>>,
     subscriptions: VecDeque<Subscription<T>>,
+    adapter: PhantomData<A>,
 }
 
 pub struct Subscription<T: Tick> {
     remaining: TimeSpan<T>,
-    state: Arc<SubscriptionState>,
+    inner: Arc<SubscriptionState>,
 }
 
 pub struct SubscriptionState {
@@ -74,19 +73,18 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
     /// Create a new `Alarm` backed by a hardware timer.
     pub fn new(timer: Timer) -> Self {
         Self {
-            timer,
-            tick: PhantomData,
-            state: Arc::new(Mutex::new(State {
-                 running: None,
-                 subscriptions: VecDeque::new(),
+            state: Arc::new(Mutex::new(SharedState {
+                timer,
+                running: None,
+                subscriptions: VecDeque::new(),
+                adapter: PhantomData,
             })),
-            adapter: PhantomData,
         }
     }
 
     /// Get the current counter value of the
     pub fn counter(&self) -> u32 {
-        self.timer.counter()
+        self.state.try_lock().unwrap().timer.counter()
     }
 
     /// Get a future that completes after a delay of length `duration`.
@@ -102,55 +100,69 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
         });
         let sub = Subscription {
             remaining: duration,
-            state: sub_state.clone(),
+            inner: sub_state.clone(),
         };
 
-        let mut state = self.state.try_lock().unwrap();
-        let index = state.get_insert_index(duration);
-        state.remove_dropped();
-        state.subscriptions.insert(index, sub);
-        drop(state);
-
+        let arc = self.state.clone();
+        let mut shared = arc.try_lock().unwrap();
+        let index = shared.get_insert_index(duration);
+        shared.remove_dropped();
+        shared.subscriptions.insert(index, sub);
         if index == 0 {
-            self.set_running(base, duration);
+            // shared.running = Some(shared.create_running(self.state.clone(), base, duration));
         }
 
         SubscriptionGuard { inner: sub_state }
     }
+}
 
-    fn set_running(&mut self, base: u32, duration: TimeSpan<T>) {
-        let state = self.state.clone();
-        let future = self.sleep_timer(base, duration).then(move |_| {
-            let mut state = state.try_lock().unwrap();
+impl<Timer: AlarmTimer<T, A>, T: Tick, A> SharedState<Timer, T, A> {
+    async fn create_running(&mut self, arc: Arc<Mutex<SharedState<Timer, T, A>>>, base: u32, duration: TimeSpan<T>) {
+        self.sleep_timer(base, duration).then(move |_| {
+            let mut shared = arc.try_lock().unwrap();
 
-            state.remove_dropped();
+            shared.remove_dropped();
 
             // Set the remaining time for each subscription.
-            for s in state.subscriptions.iter_mut() {
+            for s in shared.subscriptions.iter_mut() {
                 s.remaining -= duration;
 
                 if s.remaining.0 == 0 {
                     // Wake the future for the subscription.
-                    let old = s.state.state.compare_and_swap(WAKEABLE, COMPLETED, Ordering::AcqRel);
+                    let old = s.inner.state.compare_and_swap(WAKEABLE, COMPLETED, Ordering::AcqRel);
                     if old == WAKEABLE {
-                        let waker = s.state.waker.take(Ordering::AcqRel).unwrap();
+                        let waker = s.inner.waker.take(Ordering::AcqRel).unwrap();
                         waker.wake();
                     }
                 }
             }
 
-            state.subscriptions.retain(|x| x.remaining.0 > 0);
+            shared.subscriptions.retain(|x| x.remaining.0 > 0);
 
-            let next = state.subscriptions.front();
-            if let Some(next) = next {
+            if let Some(next) = shared.subscriptions.front() {
                 let base = Self::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
-                // self.set_running(base, next.remaining);
+                let duration = next.remaining;
+                // shared.running = Some(shared.create_running(arc.clone(), base, duration));
             }
 
             future::ready(())
-        });
+        }).await;
+    }
 
-        // self.running = Some(Box::pin(future));
+    fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
+        let mut index = 0;
+        for sub in self.subscriptions.iter() {
+            if remaining < sub.remaining {
+                break;
+            }
+            index += 1;
+        }
+        index
+    }
+
+    fn remove_dropped(&mut self) {
+        self.subscriptions
+            .retain(|x| x.inner.state.load(Ordering::Relaxed) != DROPPED);
     }
 
     fn counter_add(base: u32, duration: u32) -> u32 {
@@ -178,24 +190,6 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
             let compare = Self::counter_add(base, remaining as u32);
             self.timer.next(compare).await;
         }
-    }
-}
-
-impl<T: Tick> State<T> {
-    fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
-        let mut index = 0;
-        for sub in self.subscriptions.iter() {
-            if remaining < sub.remaining {
-                break;
-            }
-            index += 1;
-        }
-        index
-    }
-
-    fn remove_dropped(&mut self) {
-        self.subscriptions
-            .retain(|x| x.state.state.load(Ordering::Relaxed) != DROPPED);
     }
 }
 
