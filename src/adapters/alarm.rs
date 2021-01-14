@@ -128,3 +128,73 @@ pub mod fakes {
         }
     }
 }
+
+
+#[cfg(test)]
+pub mod tests {
+    use futures::future;
+    use futures_await_test::async_test;
+
+    use crate::adapters::alarm::fakes::FakeAlarmTimer;
+
+    use super::*;
+
+    #[async_test]
+    async fn sleep_less_than_a_period() {
+        let mut timer = FakeAlarmTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+
+        timer
+            .sleep(timer.counter(), TimeSpan::from_ticks(9))
+            .await;
+
+        assert_eq!(vec![3], timer.compares);
+    }
+
+    #[async_test]
+    async fn sleep_a_period() {
+        let mut timer = FakeAlarmTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+
+        timer
+            .sleep(timer.counter(), TimeSpan::from_ticks(10))
+            .await;
+
+        assert_eq!(vec![9, 4], timer.compares);
+    }
+
+    #[async_test]
+    async fn sleep_more_than_a_period() {
+        let mut timer = FakeAlarmTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+
+        timer
+            .sleep(timer.counter(), TimeSpan::from_ticks(21))
+            .await;
+
+        assert_eq!(vec![9, 4, 9, 5], timer.compares);
+    }
+
+    #[test]
+    fn sleep_drop() {
+        let mut timer = FakeAlarmTimer {
+            counter: 4,
+            running: false,
+            compares: Vec::new(),
+        };
+
+        let sleep = timer.sleep(timer.counter(), TimeSpan::from_ticks(123));
+        drop(sleep);
+
+        assert!(!timer.running);
+    }
+}
