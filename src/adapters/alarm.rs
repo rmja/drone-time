@@ -4,9 +4,11 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::Tick;
+use crate::{Tick, TimeSpan};
+use async_trait::async_trait;
 
-pub trait AlarmTimer<T: Tick, A>: Send {
+#[async_trait]
+pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
     /// AlarmTimer stop handler.
     type Stop: AlarmTimerStop;
 
@@ -22,6 +24,33 @@ pub trait AlarmTimer<T: Tick, A>: Send {
     /// Returns a future that resolves when the timer counter is equal to `compare`.
     /// Note that compare is not a duration but an absolute timestamp.
     fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop>;
+
+    async fn sleep(&mut self, mut base: u32, duration: TimeSpan<T>) {
+        let mut remaining = duration.0;
+
+        // The maximum delay is half the counters increment.
+        // This ensures that we can hit the actual fire time directly when the last timeout is setup.
+        let half_period = (Self::PERIOD / 2) as u32;
+
+        while remaining >= Self::PERIOD {
+            // We can setup the final time
+            let compare = Self::counter_add(base, half_period);
+            self.next(compare).await;
+            base = compare;
+            remaining -= half_period as u64;
+        }
+
+        if remaining > 0 {
+            let compare = Self::counter_add(base, remaining as u32);
+            self.next(compare).await;
+        }
+    }
+
+    fn counter_add(base: u32, duration: u32) -> u32 {
+        assert!(base <= Self::MAX);
+        assert!(duration <= Self::MAX);
+        ((base as u64 + duration as u64) % Self::PERIOD) as u32
+    }
 }
 
 /// AlarmTimer stop handler.

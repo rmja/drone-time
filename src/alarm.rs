@@ -6,12 +6,12 @@ use drone_core::sync::Mutex;
 use futures::prelude::*;
 
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
-pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick, A> {
+pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
     state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
-struct SharedState<Timer: AlarmTimer<T, A>, T: Tick, A> {
-    timer: Timer,
+struct SharedState<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
+    timer: RefCell<Timer>,
     running: Option<Pin<Box<dyn Future<Output = ()>>>>,
     subscriptions: VecDeque<Subscription<T>>,
     adapter: PhantomData<A>,
@@ -67,14 +67,14 @@ impl Drop for SubscriptionGuard {
     }
 }
 
-impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
+impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Alarm<Timer, T, A> {
     pub const MAX: u32 = Timer::MAX;
 
     /// Create a new `Alarm` backed by a hardware timer.
     pub fn new(timer: Timer) -> Self {
         Self {
             state: Arc::new(Mutex::new(SharedState {
-                timer,
+                timer: RefCell::new(timer),
                 running: None,
                 subscriptions: VecDeque::new(),
                 adapter: PhantomData,
@@ -84,7 +84,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
 
     /// Get the current counter value of the
     pub fn counter(&self) -> u32 {
-        self.state.try_lock().unwrap().timer.counter()
+        self.state.try_lock().unwrap().timer.borrow().counter()
     }
 
     /// Get a future that completes after a delay of length `duration`.
@@ -109,16 +109,18 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: Send> Alarm<Timer, T, A> {
         shared.remove_dropped();
         shared.subscriptions.insert(index, sub);
         if index == 0 {
-            // shared.running = Some(shared.create_running(self.state.clone(), base, duration));
+            let future = SharedState::create_running(&mut shared.timer, self.state.clone(), base, duration);
+            // shared.running = Some(Box::pin(future));
         }
 
         SubscriptionGuard { inner: sub_state }
     }
 }
 
-impl<Timer: AlarmTimer<T, A>, T: Tick, A> SharedState<Timer, T, A> {
-    async fn create_running(&mut self, arc: Arc<Mutex<SharedState<Timer, T, A>>>, base: u32, duration: TimeSpan<T>) {
-        self.sleep_timer(base, duration).then(move |_| {
+impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, T, A> {
+    async fn create_running(timer: &mut RefCell<Timer>, arc: Arc<Mutex<SharedState<Timer, T, A>>>, base: u32, duration: TimeSpan<T>) {
+        let mut timer = timer.borrow_mut();
+        timer.sleep(base, duration).then(move |_| {
             let mut shared = arc.try_lock().unwrap();
 
             shared.remove_dropped();
@@ -140,7 +142,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A> SharedState<Timer, T, A> {
             shared.subscriptions.retain(|x| x.remaining.0 > 0);
 
             if let Some(next) = shared.subscriptions.front() {
-                let base = Self::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
+                let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
                 let duration = next.remaining;
                 // shared.running = Some(shared.create_running(arc.clone(), base, duration));
             }
@@ -163,33 +165,6 @@ impl<Timer: AlarmTimer<T, A>, T: Tick, A> SharedState<Timer, T, A> {
     fn remove_dropped(&mut self) {
         self.subscriptions
             .retain(|x| x.inner.state.load(Ordering::Relaxed) != DROPPED);
-    }
-
-    fn counter_add(base: u32, duration: u32) -> u32 {
-        assert!(base <= Timer::MAX);
-        assert!(duration <= Timer::MAX);
-        ((base as u64 + duration as u64) % Timer::PERIOD) as u32
-    }
-
-    async fn sleep_timer(&mut self, mut base: u32, duration: TimeSpan<T>) {
-        let mut remaining = duration.0;
-
-        // The maximum delay is half the counters increment.
-        // This ensures that we can hit the actual fire time directly when the last timeout is setup.
-        let half_period = (Timer::PERIOD / 2) as u32;
-
-        while remaining >= Timer::PERIOD {
-            // We can setup the final time
-            let compare = Self::counter_add(base, half_period);
-            self.timer.next(compare).await;
-            base = compare;
-            remaining -= half_period as u64;
-        }
-
-        if remaining > 0 {
-            let compare = Self::counter_add(base, remaining as u32);
-            self.timer.next(compare).await;
-        }
     }
 }
 
