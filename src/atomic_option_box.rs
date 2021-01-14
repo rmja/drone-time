@@ -294,8 +294,8 @@ mod tests {
 
     #[test]
     fn atomic_box_drops() {
-        use core::sync::atomic::{AtomicUsize, Ordering};
         use alloc::sync::Arc;
+        use core::sync::atomic::{AtomicUsize, Ordering};
 
         struct K(Arc<AtomicUsize>, usize);
 

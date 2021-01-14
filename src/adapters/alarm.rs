@@ -129,7 +129,6 @@ pub mod fakes {
     }
 }
 
-
 #[cfg(test)]
 pub mod tests {
     use futures::future;
@@ -147,9 +146,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer
-            .sleep(timer.counter(), TimeSpan::from_ticks(9))
-            .await;
+        timer.sleep(timer.counter(), TimeSpan::from_ticks(9)).await;
 
         assert_eq!(vec![3], timer.compares);
     }
@@ -162,9 +159,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer
-            .sleep(timer.counter(), TimeSpan::from_ticks(10))
-            .await;
+        timer.sleep(timer.counter(), TimeSpan::from_ticks(10)).await;
 
         assert_eq!(vec![9, 4], timer.compares);
     }
@@ -177,9 +172,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer
-            .sleep(timer.counter(), TimeSpan::from_ticks(21))
-            .await;
+        timer.sleep(timer.counter(), TimeSpan::from_ticks(21)).await;
 
         assert_eq!(vec![9, 4, 9, 5], timer.compares);
     }

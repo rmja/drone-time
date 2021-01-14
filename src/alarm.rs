@@ -7,16 +7,14 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-use crate::{
-    atomic_box::AtomicBox, atomic_option_box::AtomicOptionBox, AlarmTimer, Tick, TimeSpan,
-};
+use crate::{atomic_option_box::AtomicOptionBox, AlarmTimer, Tick, TimeSpan};
 use alloc::{collections::VecDeque, sync::Arc};
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
-    timer: RefCell<Timer>,
+    timer: Arc<RefCell<Timer>>,
     state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
@@ -51,7 +49,6 @@ impl Future for SubscriptionGuard {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = self.inner.clone();
-
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
@@ -82,9 +79,8 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
     /// Create a new `Alarm` backed by a hardware timer.
     pub fn new(timer: Timer) -> Self {
         Self {
-            timer: RefCell::new(timer),
+            timer: Arc::new(RefCell::new(timer)),
             state: Arc::new(Mutex::new(SharedState {
-                // timer: RefCell::new(timer),
                 running: None,
                 subscriptions: VecDeque::new(),
                 adapter: PhantomData,
@@ -95,8 +91,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
     /// Get the current counter value of the
     pub fn counter(&self) -> u32 {
-        // self.state.try_lock().unwrap().timer.borrow().counter()
-        123
+        self.timer.borrow().counter()
     }
 
     /// Get a future that completes after a delay of length `duration`.
@@ -115,33 +110,32 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
             inner: sub_state.clone(),
         };
 
-        let arc = self.state.clone();
-        let mut shared = arc.try_lock().unwrap();
+        let mutex = self.state.clone();
+        let mut shared = mutex.try_lock().unwrap();
         let index = shared.get_insert_index(duration);
         shared.remove_dropped();
         shared.subscriptions.insert(index, sub);
         if index == 0 {
-            let mut timer = self.timer.borrow_mut();
-            // let future =
-            //     SharedState::create_running(&mut timer, self.state.clone(), base, duration);
-            // shared.running = Some(Box::pin(future));
+            let future =
+                Self::create_running(self.timer.clone(), self.state.clone(), base, duration);
+            shared.running = Some(Box::pin(future));
         }
 
         SubscriptionGuard { inner: sub_state }
     }
-}
 
-impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, T, A> {
     async fn create_running(
-        timer: &mut Timer,
-        arc: Arc<Mutex<SharedState<Timer, T, A>>>,
+        timer: Arc<RefCell<Timer>>,
+        state: Arc<Mutex<SharedState<Timer, T, A>>>,
         base: u32,
         duration: TimeSpan<T>,
     ) {
-        timer
+        let mut t = timer.borrow_mut();
+        let timer = timer.clone();
+        t
             .sleep(base, duration)
             .then(move |_| {
-                let mut shared = arc.try_lock().unwrap();
+                let mut shared = state.try_lock().unwrap();
 
                 shared.remove_dropped();
 
@@ -167,14 +161,18 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, 
                 if let Some(next) = shared.subscriptions.front() {
                     let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
-                    // shared.running = Some(shared.create_running(arc.clone(), base, duration));
+                    let future =
+                        Self::create_running(timer, state.clone(), base, duration);
+                    shared.running = Some(Box::pin(future));
                 }
 
                 future::ready(())
             })
             .await;
     }
+}
 
+impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, T, A> {
     fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
         let mut index = 0;
         for sub in self.subscriptions.iter() {
