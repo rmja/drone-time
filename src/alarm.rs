@@ -26,17 +26,19 @@ struct SharedState<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
 }
 
 pub struct Subscription<T: Tick> {
+    /// The remaining duration until the future is resolved.
     remaining: TimeSpan<T>,
-    inner: Arc<SubscriptionState>,
+    /// Shared state related to the subscription.
+    shared: Arc<SubscriptionShared>,
 }
 
-pub struct SubscriptionState {
+/// The state related to a subscription.
+/// It is basically an enum where `waker` is only defined if state is `WAKEABLE`.
+struct SubscriptionShared {
+    /// The subscription state (ADDED, WAKEABLE, COMPLETED, DROPPED).
     state: AtomicUsize,
+    /// The waker to be invoked when the future should complete.
     waker: AtomicOptionBox<Waker>,
-}
-
-pub struct SubscriptionGuard {
-    inner: Arc<SubscriptionState>,
 }
 
 const ADDED: usize = 0;
@@ -44,22 +46,32 @@ const WAKEABLE: usize = 1;
 const COMPLETED: usize = 2;
 const DROPPED: usize = 3;
 
+pub struct SubscriptionGuard {
+    shared: Arc<SubscriptionShared>,
+}
+
 impl Future for SubscriptionGuard {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let inner = self.inner.clone();
+        let shared = self.shared.clone();
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
-        inner.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
+        shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
-        let old = inner.state.swap(WAKEABLE, Ordering::AcqRel);
+        // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
+        let old = shared.state.swap(WAKEABLE, Ordering::AcqRel);
         assert!(old != DROPPED);
         if old == COMPLETED {
             // Timeout has already occured.
-            inner.waker.take(Ordering::AcqRel);
-            inner.state.store(COMPLETED, Ordering::Release);
+
+            // Set the state back to COMPLETED.
+            shared.state.store(COMPLETED, Ordering::Release);
+
+            // Remove the waker that we just assigned - it turns out that it was not needed as we are about to return `Ready`.
+            shared.waker.take(Ordering::AcqRel);
+
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -69,7 +81,7 @@ impl Future for SubscriptionGuard {
 
 impl Drop for SubscriptionGuard {
     fn drop(&mut self) {
-        self.inner.state.store(DROPPED, Ordering::Release);
+        self.shared.state.store(DROPPED, Ordering::Release);
     }
 }
 
@@ -91,6 +103,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
     /// Get the current counter value of the
     pub fn counter(&self) -> u32 {
+        // TODO: Is this safe? Can we always borrow?
         self.timer.borrow().counter()
     }
 
@@ -101,27 +114,33 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
-        let sub_state = Arc::new(SubscriptionState {
+        let sub_state = Arc::new(SubscriptionShared {
             state: AtomicUsize::new(ADDED),
             waker: AtomicOptionBox::new(None),
         });
         let sub = Subscription {
             remaining: duration,
-            inner: sub_state.clone(),
+            shared: sub_state.clone(),
         };
 
         let mutex = self.state.clone();
         let mut shared = mutex.try_lock().unwrap();
-        let index = shared.get_insert_index(duration);
+
+        // Remove all subscriptions that are in the `DROPPED` state.
         shared.remove_dropped();
+
+        // Find the position where the new subscription should be added and insert.
+        let index = shared.get_insert_index(duration);
         shared.subscriptions.insert(index, sub);
+
         if index == 0 {
+            // It turns out that this subscription is the next in line.
             let future =
                 Self::create_future(self.timer.clone(), self.state.clone(), base, duration);
             shared.future = Some(Box::pin(future));
         }
 
-        SubscriptionGuard { inner: sub_state }
+        SubscriptionGuard { shared: sub_state }
     }
 
     async fn create_future(
@@ -136,6 +155,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
             .then(move |_| {
                 let mut shared = state.try_lock().unwrap();
 
+                // Remove all subscriptions that are in the `DROPPED` state.
                 shared.remove_dropped();
 
                 // Set the remaining time for each subscription.
@@ -145,19 +165,25 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
                     if s.remaining.0 == 0 {
                         // Wake the future for the subscription.
                         let old =
-                            s.inner
+                            s.shared
                                 .state
-                                .compare_and_swap(WAKEABLE, COMPLETED, Ordering::AcqRel);
+                                .swap(COMPLETED, Ordering::AcqRel);
                         if old == WAKEABLE {
-                            let waker = s.inner.waker.take(Ordering::AcqRel).unwrap();
+                            let waker = s.shared.waker.take(Ordering::AcqRel).unwrap();
                             waker.wake();
+                        }
+                        else if old == DROPPED {
+                            s.shared.state.store(DROPPED, Ordering::Release);
                         }
                     }
                 }
 
+                // Remove all subscriptions that have remaining == 0.
                 shared.subscriptions.retain(|x| x.remaining.0 > 0);
 
                 if let Some(next) = shared.subscriptions.front() {
+                    // Create a future for the next subscription in line.
+                    
                     let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
                     let future = Self::create_future(timer, state.clone(), base, duration);
@@ -186,7 +212,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, 
 
     fn remove_dropped(&mut self) {
         self.subscriptions
-            .retain(|x| x.inner.state.load(Ordering::Relaxed) != DROPPED);
+            .retain(|x| x.shared.state.load(Ordering::Relaxed) != DROPPED);
     }
 }
 
