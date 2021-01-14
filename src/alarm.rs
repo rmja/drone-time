@@ -164,15 +164,11 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
                     if s.remaining.0 == 0 {
                         // Wake the future for the subscription.
-                        let old =
-                            s.shared
-                                .state
-                                .swap(COMPLETED, Ordering::AcqRel);
+                        let old = s.shared.state.swap(COMPLETED, Ordering::AcqRel);
                         if old == WAKEABLE {
                             let waker = s.shared.waker.take(Ordering::AcqRel).unwrap();
                             waker.wake();
-                        }
-                        else if old == DROPPED {
+                        } else if old == DROPPED {
                             s.shared.state.store(DROPPED, Ordering::Release);
                         }
                     }
@@ -183,7 +179,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
                 if let Some(next) = shared.subscriptions.front() {
                     // Create a future for the next subscription in line.
-                    
+
                     let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
                     let future = Self::create_future(timer, state.clone(), base, duration);
