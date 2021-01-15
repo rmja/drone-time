@@ -96,23 +96,26 @@ pub mod fakes {
 
     use super::*;
 
+    pub struct FakeDrv;
+
+    pub struct FakeAlarmCounter(pub(crate) u32);
+
     pub struct FakeAlarmTimer {
-        pub(crate) counter: u32,
         pub(crate) running: bool,
         pub(crate) compares: Vec<u32>,
     }
 
-    impl Tick for FakeAlarmTimer {
+    impl Tick for FakeDrv {
         const FREQ: u32 = 1;
     }
 
-    impl AlarmCounter<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
+    impl AlarmCounter<FakeDrv, FakeDrv> for FakeAlarmCounter {
         fn value(&self) -> u32 {
-            self.counter
+            self.0
         }
     }
 
-    impl AlarmTimer<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
+    impl AlarmTimer<FakeDrv, FakeDrv> for FakeAlarmTimer {
         type Stop = Self;
         const MAX: u32 = 9;
 
@@ -146,12 +149,11 @@ pub mod tests {
     #[async_test]
     async fn sleep_less_than_a_period() {
         let mut timer = FakeAlarmTimer {
-            counter: 4,
             running: false,
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.value(), TimeSpan::from_ticks(9)).await;
+        timer.sleep(4, TimeSpan::from_ticks(9)).await;
 
         assert_eq!(vec![3], timer.compares);
     }
@@ -159,12 +161,11 @@ pub mod tests {
     #[async_test]
     async fn sleep_a_period() {
         let mut timer = FakeAlarmTimer {
-            counter: 4,
             running: false,
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.value(), TimeSpan::from_ticks(10)).await;
+        timer.sleep(4, TimeSpan::from_ticks(10)).await;
 
         assert_eq!(vec![9, 4], timer.compares);
     }
@@ -172,12 +173,11 @@ pub mod tests {
     #[async_test]
     async fn sleep_more_than_a_period() {
         let mut timer = FakeAlarmTimer {
-            counter: 4,
             running: false,
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.value(), TimeSpan::from_ticks(21)).await;
+        timer.sleep(4, TimeSpan::from_ticks(21)).await;
 
         assert_eq!(vec![9, 4, 9, 5], timer.compares);
     }
@@ -185,12 +185,11 @@ pub mod tests {
     #[test]
     fn sleep_drop() {
         let mut timer = FakeAlarmTimer {
-            counter: 4,
             running: false,
             compares: Vec::new(),
         };
 
-        let sleep = timer.sleep(timer.value(), TimeSpan::from_ticks(123));
+        let sleep = timer.sleep(4, TimeSpan::from_ticks(123));
         drop(sleep);
 
         assert!(!timer.running);

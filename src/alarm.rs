@@ -59,7 +59,7 @@ impl Future for SubscriptionGuard {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Always poll the underlying timer sleep future.
+        // Always poll the underlying timer sleep future - it won't start otherwise.
         let running = self.running.clone();
         if let Some(mut future) = running.take(Ordering::AcqRel) {
             if future.poll_unpin(cx).is_pending() {
@@ -236,28 +236,43 @@ impl<T: Tick> VecDequeExt<T> for VecDeque<Subscription<T>> {
     }
 }
 
-// #[cfg(test)]
-// pub mod tests {
-//     use futures::future;
-//     use futures_await_test::async_test;
+#[cfg(test)]
+pub mod tests {
+    use std::thread::spawn;
 
-//     use crate::adapters::alarm::fakes::FakeAlarmTimer;
+    use futures::future;
+    use futures_await_test::async_test;
 
-//     use super::*;
+    use crate::adapters::alarm::fakes::{FakeAlarmCounter, FakeAlarmTimer};
 
-//     #[async_test]
-//     async fn whoot() {
-//         let timer = FakeAlarmTimer {
-//             counter: 4,
-//             running: false,
-//             compares: Vec::new(),
-//         };
-//         let mut alarm = Alarm::new(timer);
+    use super::*;
 
-//         let t1 = alarm.sleep(TimeSpan::from_ticks(2));
-//         let t2 = alarm.sleep(TimeSpan::from_ticks(1));
-//         let t3 = alarm.sleep(TimeSpan::from_ticks(3));
+    #[async_test]
+    async fn whoot() {
+        let counter = FakeAlarmCounter(4);
+        let timer = FakeAlarmTimer {
+            running: false,
+            compares: Vec::new(),
+        };
+        let mut alarm = Alarm::new(counter, timer);
 
-//         future::join3(t1, t2, t3).await;
-//     }
-// }
+        let fires = Mutex::new(Vec::new());
+        let t1 = alarm.sleep(TimeSpan::from_ticks(2)).then(|_| {
+            fires.try_lock().unwrap().push(2);
+            future::ready(())
+        });
+        let t2 = alarm.sleep(TimeSpan::from_ticks(1)).then(|_| {
+            fires.try_lock().unwrap().push(1);
+            future::ready(())
+        });
+        let t3 = alarm.sleep(TimeSpan::from_ticks(3)).then(|_| {
+            fires.try_lock().unwrap().push(3);
+            future::ready(())
+        });
+
+        future::join3(t1, t2, t3).await;
+
+        // TODO: Find a way for the fake to actually schedule in correct order.
+        assert_eq!(vec![1,2,3], fires.into_inner());
+    }
+}
