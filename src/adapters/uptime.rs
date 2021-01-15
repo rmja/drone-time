@@ -1,6 +1,8 @@
+use crate::Tick;
+
 /// The timer backing Uptime.
 /// The timer must be monotonically increasing in the interval 0 <= counter() <= MAX.
-pub trait UptimeTimer<A>: Sync {
+pub trait UptimeTimer<T: Tick, A>: Sync {
     /// The maximum counter value.
     const MAX: u32;
 

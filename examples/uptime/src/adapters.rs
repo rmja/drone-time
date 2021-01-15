@@ -6,7 +6,7 @@ impl Tick for SysTickUptimeTick {
     const FREQ: u32 = consts::SYSCLK.f();
 }
 
-pub struct Tim2UptimeTick;
-impl Tick for Tim2UptimeTick {
+pub struct Tim2Tick;
+impl Tick for Tim2Tick {
     const FREQ: u32 = consts::TIM2_FREQ;
 }

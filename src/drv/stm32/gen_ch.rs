@@ -44,7 +44,7 @@ impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1 {
             tim_sr: tim.tim_sr.into_copy(),
             tim_arr: tim.tim_arr,
             tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt,
+            tim_cnt: tim.tim_cnt.into_copy(),
             tim_ccr: tim.tim_ccr1,
         }
     }
@@ -83,7 +83,7 @@ impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for Ti
             tim_sr: tim.tim_sr.into_copy(),
             tim_arr: tim.tim_arr,
             tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt,
+            tim_cnt: tim.tim_cnt.into_copy(),
             tim_ccr: tim.tim_ccr2,
         }
     }
@@ -122,7 +122,7 @@ impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for Ti
             tim_sr: tim.tim_sr.into_copy(),
             tim_arr: tim.tim_arr,
             tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt,
+            tim_cnt: tim.tim_cnt.into_copy(),
             tim_ccr: tim.tim_ccr3,
         }
     }
@@ -161,7 +161,7 @@ impl<Tim: GeneralTimMap + TimCcr4 + TimDierCc4Ie + TimSrCc4If> TimCh<Tim> for Ti
             tim_sr: tim.tim_sr.into_copy(),
             tim_arr: tim.tim_arr,
             tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt,
+            tim_cnt: tim.tim_cnt.into_copy(),
             tim_ccr: tim.tim_ccr4,
         }
     }

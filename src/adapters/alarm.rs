@@ -8,6 +8,11 @@ use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 
+pub trait AlarmCounter<T: Tick, A>: Sync {
+    /// Get the current counter value of the timer.
+    fn value(&self) -> u32;
+}
+
 #[async_trait]
 pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
     /// AlarmTimer stop handler.
@@ -18,9 +23,6 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
 
     /// The timer period.
     const PERIOD: u64 = Self::MAX as u64 + 1;
-
-    /// Get the current counter value of the timer.
-    fn counter(&self) -> u32;
 
     /// Returns a future that resolves when the timer counter is equal to `compare`.
     /// Note that compare is not a duration but an absolute timestamp.
@@ -107,10 +109,6 @@ pub mod fakes {
     impl AlarmTimer<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
         type Stop = Self;
         const MAX: u32 = 9;
-
-        fn counter(&self) -> u32 {
-            self.counter
-        }
 
         fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
             assert!(compare <= Self::MAX);

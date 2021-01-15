@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::UptimeTimer;
+use crate::{Tick, UptimeTimer};
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
@@ -13,7 +13,7 @@ impl SysTickDrv {
 
 unsafe impl Sync for SysTickDrv {}
 
-impl UptimeTimer<SysTickDrv> for SysTickDrv {
+impl<T: Tick> UptimeTimer<T, SysTickDrv> for SysTickDrv {
     const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
 
     fn start(&self) {

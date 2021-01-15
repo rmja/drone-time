@@ -7,15 +7,21 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-use crate::{AlarmTimer, Tick, TimeSpan};
+use crate::{AlarmCounter, AlarmTimer, Tick, TimeSpan};
 use alloc::{collections::VecDeque, sync::Arc};
 use atomicbox::AtomicOptionBox;
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
-pub struct Alarm<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
-    timer: Arc<RefCell<Timer>>,
+pub struct Alarm<
+    Counter: AlarmCounter<T, A>,
+    Timer: AlarmTimer<T, A>,
+    T: Tick + 'static,
+    A: 'static,
+> {
+    counter: Counter,
+    timer: Arc<Mutex<Timer>>,
     state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
@@ -88,13 +94,20 @@ impl Drop for SubscriptionGuard {
     }
 }
 
-impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Alarm<Timer, T, A> {
+impl<
+        Counter: AlarmCounter<T, A>,
+        Timer: AlarmTimer<T, A> + 'static,
+        T: Tick + 'static,
+        A: Send + 'static,
+    > Alarm<Counter, Timer, T, A>
+{
     pub const MAX: u32 = Timer::MAX;
 
     /// Create a new `Alarm` backed by a hardware timer.
-    pub fn new(timer: Timer, _tick: T) -> Self {
+    pub fn new(counter: Counter, timer: Timer) -> Self {
         Self {
-            timer: Arc::new(RefCell::new(timer)),
+            counter,
+            timer: Arc::new(Mutex::new(timer)),
             state: Arc::new(Mutex::new(SharedState {
                 future: None,
                 subscriptions: VecDeque::new(),
@@ -104,10 +117,9 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
         }
     }
 
-    /// Get the current counter value of the
+    /// Get the current counter value of the underlying hardware timer.
     pub fn counter(&self) -> u32 {
-        // TODO: Is this safe? Can we always borrow?
-        self.timer.borrow().counter()
+        self.counter.value()
     }
 
     /// Get a future that completes after a delay of length `duration`.
@@ -138,9 +150,9 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
         if index == 0 {
             // It turns out that this subscription is the next in line.
-            let future =
-                Self::create_future(self.timer.clone(), self.state.clone(), base, duration);
-            shared.future = Some(future.boxed_local());
+            // let future =
+            //     Self::create_future(self.timer.clone(), self.state.clone(), base, duration);
+            // shared.future = Some(future.boxed_local());
         }
 
         SubscriptionGuard { shared: sub_state }
@@ -185,8 +197,8 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
 
                     let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
-                    let future = Self::create_future(timer, state.clone(), base, duration);
-                    shared.future = Some(future.boxed_local());
+                    // let future = Self::create_future(timer, state.clone(), base, duration);
+                    // shared.future = Some(future.boxed_local());
                 } else {
                     shared.future = None;
                 }

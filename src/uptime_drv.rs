@@ -7,7 +7,7 @@ use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{Tick, TimeSpan, Uptime, UptimeTimer};
 
-pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<A>, A> {
+pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<T, A>, A> {
     clock: PhantomData<T>,
     timer: Timer,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
@@ -20,12 +20,12 @@ pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<A>, A> {
     adapter: PhantomData<A>,
 }
 
-unsafe impl<T: Tick, Timer: UptimeTimer<A>, A> Sync for UptimeDrv<T, Timer, A> {}
+unsafe impl<T: Tick, Timer: UptimeTimer<T, A>, A> Sync for UptimeDrv<T, Timer, A> {}
 
 impl<T, Timer, A> UptimeDrv<T, Timer, A>
 where
     T: Tick + Send + 'static,
-    Timer: UptimeTimer<A> + Send + 'static,
+    Timer: UptimeTimer<T, A> + Send + 'static,
     A: Send + 'static,
 {
     /// Start the uptime counter.
@@ -98,7 +98,7 @@ where
 impl<T, Timer, A> Uptime<T> for UptimeDrv<T, Timer, A>
 where
     T: Tick + Send + 'static,
-    Timer: UptimeTimer<A> + Send + 'static,
+    Timer: UptimeTimer<T, A> + Send + 'static,
     A: Send + 'static,
 {
     fn counter(&self) -> u32 {
