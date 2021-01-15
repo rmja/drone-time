@@ -106,6 +106,12 @@ pub mod fakes {
         const FREQ: u32 = 1;
     }
 
+    impl AlarmCounter<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
+        fn value(&self) -> u32 {
+            self.counter
+        }
+    }
+
     impl AlarmTimer<FakeAlarmTimer, FakeAlarmTimer> for FakeAlarmTimer {
         type Stop = Self;
         const MAX: u32 = 9;
@@ -145,7 +151,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.counter(), TimeSpan::from_ticks(9)).await;
+        timer.sleep(timer.value(), TimeSpan::from_ticks(9)).await;
 
         assert_eq!(vec![3], timer.compares);
     }
@@ -158,7 +164,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.counter(), TimeSpan::from_ticks(10)).await;
+        timer.sleep(timer.value(), TimeSpan::from_ticks(10)).await;
 
         assert_eq!(vec![9, 4], timer.compares);
     }
@@ -171,7 +177,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        timer.sleep(timer.counter(), TimeSpan::from_ticks(21)).await;
+        timer.sleep(timer.value(), TimeSpan::from_ticks(21)).await;
 
         assert_eq!(vec![9, 4, 9, 5], timer.compares);
     }
@@ -184,7 +190,7 @@ pub mod tests {
             compares: Vec::new(),
         };
 
-        let sleep = timer.sleep(timer.counter(), TimeSpan::from_ticks(123));
+        let sleep = timer.sleep(timer.value(), TimeSpan::from_ticks(123));
         drop(sleep);
 
         assert!(!timer.running);

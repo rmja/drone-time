@@ -75,7 +75,7 @@ pub mod tests {
         const FREQ: u32 = 32768;
     }
 
-    impl UptimeTimer<TestTick> for TestAlarm {
+    impl UptimeTimer<TestTick, TestTick> for TestAlarm {
         const MAX: u32 = 0xFFFF;
 
         fn start(&self) {}
