@@ -29,7 +29,7 @@ where
     A: Send + 'static,
 {
     /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt, _tick: T) -> Arc<Self> {
+    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Arc<impl Uptime<T>> {
         let uptime = Arc::new(Self {
             clock: PhantomData,
             timer,

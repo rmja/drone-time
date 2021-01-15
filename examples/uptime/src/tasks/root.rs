@@ -61,47 +61,47 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     );
     let tim2 = GeneralTimCfg::with_enabled_clock(setup);
     let tim2 = GeneralTimDrv::new_ch1(tim2.release(), thr.tim_2, Tim2Tick);
-    // let uptime = UptimeDrv::start(tim2, thr.tim_2, Tim2Tick);
+    let (
+        uptime_timer,
+        alarm_counter,
+        alarm_timer
+    ) = tim2.split();
 
-    // let mut watch = Watch::new(&*uptime);
-
-    // watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
-
-    // let mut last = TimeSpan::ZERO;
-    // let mut last_seconds = i32::MAX;
-    // loop {
-    //     let now = uptime.now();
-    //     assert!(now >= last);
-
-    //     let now_seconds = now.as_secs();
-    //     if now_seconds != last_seconds {
-    //         println!("{:?}: {:?}", now, watch.at(now).unwrap().parts());
-    //     }
-
-    //     last = now;
-    //     last_seconds = now_seconds;
-    // }
-
-    let (uptime_timer, alarm_counter, alarm_timer) = tim2.split();
-
-    uptime_timer.start();
-
+    let uptime = UptimeDrv::start(uptime_timer, thr.tim_2);
     let mut alarm = Alarm::new(alarm_counter, alarm_timer);
+    let mut watch = Watch::new(&*uptime);
+    watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 
     let f1 = alarm.sleep(TimeSpan::from_secs(6)).then(|_| {
+        println!("{:?}", uptime.now());
         println!("6 seconds passed");
         future::ready(())
     });
     let f2 = alarm.sleep(TimeSpan::from_secs(4)).then(|_| {
+        println!("{:?}", uptime.now());
         println!("4 seconds passed");
         future::ready(())
     });
     let f3 = alarm.sleep(TimeSpan::from_secs(8)).then(|_| {
+        println!("{:?}", uptime.now());
         println!("8 seconds passed");
         future::ready(())
     });
 
-    println!("Starting sleep");
     future::join3(f1, f2, f3).root_wait();
-    println!("All done");
+
+    let mut last = TimeSpan::ZERO;
+    let mut last_seconds = i32::MAX;
+    loop {
+        let now = uptime.now();
+        assert!(now >= last);
+
+        let now_seconds = now.as_secs();
+        if now_seconds != last_seconds {
+            println!("{:?}: {:?}", now, watch.at(now).unwrap().parts());
+        }
+
+        last = now;
+        last_seconds = now_seconds;
+    }
 }
