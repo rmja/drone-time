@@ -62,6 +62,7 @@ impl Future for SubscriptionGuard {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Always poll the underlying timer sleep future.
         let running = self.running.clone();
         if let Some(mut future) = running.take(Ordering::AcqRel) {
             if future.poll_unpin(cx).is_pending() {
