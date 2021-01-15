@@ -1,4 +1,6 @@
 #![feature(asm)]
+#![feature(const_fn)] 
+#![feature(const_panic)]
 #![feature(never_type)]
 #![feature(prelude_import)]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -7,10 +9,9 @@ extern crate alloc;
 
 mod adapters;
 mod alarm;
-mod atomic_box;
-mod atomic_option_box;
 mod datetime;
 pub mod drv;
+mod timeout;
 mod timespan;
 mod uptime;
 mod uptime_drv;
@@ -22,6 +23,7 @@ pub use self::{
     adapters::uptime::UptimeAlarm,
     alarm::Alarm,
     datetime::{DateTime, Month},
+    timeout::Timeout,
     timespan::TimeSpan,
     uptime::Uptime,
     uptime_drv::UptimeDrv,

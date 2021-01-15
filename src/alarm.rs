@@ -7,8 +7,9 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-use crate::{atomic_option_box::AtomicOptionBox, AlarmTimer, Tick, TimeSpan};
+use crate::{AlarmTimer, Tick, TimeSpan};
 use alloc::{collections::VecDeque, sync::Arc};
+use atomicbox::AtomicOptionBox;
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
@@ -58,7 +59,9 @@ impl Future for SubscriptionGuard {
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
-        shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
+        // TODO: Use store() when available in atomicbox.
+        // shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
+        let _ = shared.waker.swap(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
         let old = shared.state.swap(WAKEABLE, Ordering::AcqRel);
