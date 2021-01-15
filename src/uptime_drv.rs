@@ -124,6 +124,6 @@ where
             }
         };
 
-        TimeSpan(now, PhantomData)
+        TimeSpan::from_ticks(now as i64)
     }
 }

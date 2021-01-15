@@ -6,7 +6,7 @@ use core::{
 
 use crate::Tick;
 
-pub struct TimeSpan<T: Tick>(pub u64, pub(crate) PhantomData<T>);
+pub struct TimeSpan<T: Tick>(pub i64, PhantomData<T>);
 
 impl<T: Tick> Copy for TimeSpan<T> {}
 
@@ -18,25 +18,30 @@ impl<T: Tick> Clone for TimeSpan<T> {
 
 #[derive(Debug)]
 pub struct TimeSpanParts {
-    pub days: u16,
-    pub hours: u16,
-    pub mins: u8,
-    pub secs: u8,
-    pub millis: u16,
+    pub days: i16,
+    pub hours: i8,
+    pub mins: i8,
+    pub secs: i8,
+    pub millis: i16,
 }
 
 impl<T: Tick> TimeSpan<T> {
     pub const ZERO: Self = Self(0, PhantomData);
-    const MAX_SECS: u32 = u32::MAX;
-    const MAX_MILLIS: u64 = Self::MAX_SECS as u64 * 1000;
-    const MAX_DAYS: u16 = (Self::MAX_SECS / 60 / 60 / 24) as u16;
-    const TICKS_PER_SEC: u64 = T::FREQ as u64;
-    const TICKS_PER_MIN: u64 = Self::TICKS_PER_SEC * 60;
-    const TICKS_PER_HOUR: u64 = Self::TICKS_PER_MIN * 60;
-    const TICKS_PER_DAY: u64 = Self::TICKS_PER_HOUR * 24;
+    pub const MAX: Self = Self(i64::MAX, PhantomData);
+    pub const MIN: Self = Self(i64::MIN, PhantomData);
+    const MAX_MILLIS: i64 = Self::MAX_SECS as i64 * 1000;
+    const MAX_SECS: i32 = i32::MAX;
+    const MAX_DAYS: i16 = (Self::MAX_SECS / 60 / 60 / 24) as i16;
+    const MIN_MILLIS: i64 = Self::MIN_SECS as i64 * 1000;
+    const MIN_SECS: i32 = i32::MIN;
+    const MIN_DAYS: i16 = (Self::MIN_SECS / 60 / 60 / 24) as i16;
+    const TICKS_PER_SEC: i64 = T::FREQ as i64;
+    const TICKS_PER_MIN: i64 = Self::TICKS_PER_SEC * 60;
+    const TICKS_PER_HOUR: i64 = Self::TICKS_PER_MIN * 60;
+    const TICKS_PER_DAY: i64 = Self::TICKS_PER_HOUR * 24;
 
-    /// Create a new `TimeSpan`.
-    pub fn new(hours: u16, mins: u8, secs: u8) -> Self {
+    /// Create a new `TimeSpan` from `hours`, `mins`, and `secs`.
+    pub const fn new_time(hours: i8, mins: i8, secs: i8) -> Self {
         Self::from_parts(TimeSpanParts {
             days: 0,
             hours,
@@ -46,34 +51,45 @@ impl<T: Tick> TimeSpan<T> {
         })
     }
 
-    pub fn infinite() -> Self {
-        Self(u64::MAX, PhantomData)
-    }
-
     /// Create a new `TimeSpan` from individual components.
-    pub fn from_parts(parts: TimeSpanParts) -> Self {
-        assert!(parts.days <= Self::MAX_DAYS);
-        assert!(parts.hours < 24);
-        assert!(parts.mins < 60);
-        assert!(parts.secs < 60);
-        assert!(parts.millis < 1000);
+    pub const fn from_parts(parts: TimeSpanParts) -> Self {
+        assert!(parts.days >= Self::MIN_DAYS && parts.days <= Self::MAX_DAYS);
+        assert!(parts.hours > -24 && parts.hours < 24);
+        assert!(parts.mins > -60 && parts.mins < 60);
+        assert!(parts.secs > -60 && parts.secs < 60);
+        assert!(parts.millis > -1000 && parts.millis < 1000);
 
-        let ticks = parts.days as u64 * Self::TICKS_PER_DAY
-            + parts.hours as u64 * Self::TICKS_PER_HOUR
-            + parts.mins as u64 * Self::TICKS_PER_MIN
-            + parts.secs as u64 * Self::TICKS_PER_SEC
-            + (parts.millis as u64 * Self::TICKS_PER_SEC) / 1000;
+        let ticks = parts.days as i64 * Self::TICKS_PER_DAY
+            + parts.hours as i64 * Self::TICKS_PER_HOUR
+            + parts.mins as i64 * Self::TICKS_PER_MIN
+            + parts.secs as i64 * Self::TICKS_PER_SEC
+            + (parts.millis as i64 * Self::TICKS_PER_SEC) / 1000;
         Self::from_ticks(ticks)
     }
 
+    /// Create a new `TimeSpan` from the specified number of _whole_ days.
+    pub const fn from_days(days: i16) -> Self {
+        Self::from_ticks(days as i64 * Self::TICKS_PER_DAY)
+    }
+
+    /// Create a new `TimeSpan` from the specified number of _whole_ hours.
+    pub const fn from_hours(hours: i32) -> Self {
+        Self::from_ticks(hours as i64 * Self::TICKS_PER_HOUR)
+    }
+
+    /// Create a new `TimeSpan` from the specified number of _whole_ mins.
+    pub const fn from_mins(mins: i32) -> Self {
+        Self::from_ticks(mins as i64 * Self::TICKS_PER_MIN)
+    }
+
     /// Create a new `TimeSpan` from the specified number of _whole_ seconds.
-    pub fn from_secs(secs: u32) -> Self {
-        Self::from_ticks(secs as u64 * Self::TICKS_PER_SEC)
+    pub const fn from_secs(secs: i32) -> Self {
+        Self::from_ticks(secs as i64 * Self::TICKS_PER_SEC)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ milliseconds.
-    pub fn from_millis(millis: u64) -> Self {
-        assert!(millis <= Self::MAX_MILLIS);
+    pub const fn from_millis(millis: i64) -> Self {
+        assert!(millis >= Self::MIN_MILLIS && millis <= Self::MAX_MILLIS);
 
         let secs = millis / 1000;
         let sub_secs = millis - secs * 1000;
@@ -82,18 +98,12 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ ticks.
-    pub fn from_ticks(ticks: u64) -> Self {
+    pub const fn from_ticks(ticks: i64) -> Self {
         Self(ticks, PhantomData)
-    }
-
-    pub fn is_infinite(&self) -> bool {
-        self.0 == u64::MAX
     }
 
     /// Get the individual components of a `TimeSpan`.
     pub fn parts(&self) -> TimeSpanParts {
-        assert!(!self.is_infinite());
-
         let mut ticks = self.0;
 
         let days = ticks / Self::TICKS_PER_DAY;
@@ -112,26 +122,33 @@ impl<T: Tick> TimeSpan<T> {
         let millis = (ticks * 1000 + Self::TICKS_PER_SEC / 2) / Self::TICKS_PER_SEC;
 
         TimeSpanParts {
-            days: days as u16,
-            hours: hours as u16,
-            mins: mins as u8,
-            secs: secs as u8,
-            millis: millis as u16,
+            days: days as i16,
+            hours: hours as i8,
+            mins: mins as i8,
+            secs: secs as i8,
+            millis: millis as i16,
+        }
+    }
+
+    /// Get the absolute duration of a `TimeSpan`.
+    pub fn abs(&self) -> Self {
+        assert!(self.0 != Self::MIN.0, "Overflow!");
+        if self.0 >= 0 {
+            Self(self.0, PhantomData)
+        }
+        else {
+            Self(-self.0, PhantomData)
         }
     }
 
     /// Get the number of _whole_ seconds in the `TimeSpan`.
-    pub fn as_secs(&self) -> u32 {
-        assert!(!self.is_infinite());
-
-        (self.0 / Self::TICKS_PER_SEC) as u32
+    pub fn as_secs(&self) -> i32 {
+        (self.0 / Self::TICKS_PER_SEC) as i32
     }
 
     /// Get the number of _whole_ milliseconds in the `TimeSpan`.
-    pub fn as_millis(&self) -> u64 {
-        assert!(!self.is_infinite());
-
-        let secs = self.as_secs() as u64;
+    pub fn as_millis(&self) -> i64 {
+        let secs = self.as_secs() as i64;
         let sub_secs = self.0 - secs * Self::TICKS_PER_SEC;
         // Round to nearest.
         secs * 1000 + (sub_secs * 1000 + Self::TICKS_PER_SEC / 2) / Self::TICKS_PER_SEC
@@ -141,12 +158,6 @@ impl<T: Tick> TimeSpan<T> {
 impl<T: Tick> Default for TimeSpan<T> {
     fn default() -> Self {
         Self::ZERO
-    }
-}
-
-impl<T: Tick> Into<u64> for TimeSpan<T> {
-    fn into(self) -> u64 {
-        self.0
     }
 }
 
@@ -231,6 +242,13 @@ pub mod tests {
         assert_eq!(3, parts.mins);
         assert_eq!(4, parts.secs);
         assert_eq!(5, parts.millis);
+    }
+
+    #[test]
+    fn abs() {
+        let ts = TimeSpan::<TestTick>::from_ticks(-10);
+
+        assert_eq!(-ts.0, ts.abs().0);
     }
 
     #[test]

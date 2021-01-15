@@ -183,7 +183,7 @@ impl<Timer: AlarmTimer<T, A> + 'static, T: Tick + 'static, A: Send + 'static> Al
                 if let Some(next) = shared.subscriptions.front() {
                     // Create a future for the next subscription in line.
 
-                    let base = Timer::counter_add(base, (duration.0 % Timer::PERIOD) as u32);
+                    let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
                     let future = Self::create_future(timer, state.clone(), base, duration);
                     shared.future = Some(Box::pin(future));

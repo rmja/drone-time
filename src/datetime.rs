@@ -160,7 +160,12 @@ impl<T: Tick> Add<TimeSpan<T>> for DateTime {
     type Output = DateTime;
 
     fn add(self, rhs: TimeSpan<T>) -> Self::Output {
-        DateTime(self.0 + rhs.as_secs())
+        if rhs.0 >= 0 {
+            DateTime(self.0 + rhs.as_secs() as u32)
+        }
+        else {
+            DateTime(self.0 - (-rhs.as_secs()) as u32)
+        }
     }
 }
 
@@ -168,13 +173,14 @@ impl<T: Tick> Sub<TimeSpan<T>> for DateTime {
     type Output = DateTime;
 
     fn sub(self, rhs: TimeSpan<T>) -> Self::Output {
-        DateTime(self.0 - rhs.as_secs())
+        if rhs.0 >= 0 {
+            DateTime(self.0 - rhs.as_secs() as u32)
+        }
+        else {
+            DateTime(self.0 + (-rhs.as_secs()) as u32)
+        }
     }
 }
-
-// fn is_valid_date(year: u16, month: Month, day: u8) -> bool {
-//     day >= 1 && day <= days_in_month(year, month)
-// }
 
 fn days_in_month(year: u16, month: Month) -> u8 {
     if is_leap_year(year) && month == Month::February {
@@ -211,6 +217,12 @@ const fn is_leap_year(year: u16) -> bool {
 pub mod test {
     use super::*;
 
+    struct TestTick;
+
+    impl Tick for TestTick {
+        const FREQ: u32 = 32768;
+    }
+
     #[test]
     fn parts() {
         let dt = DateTime::new(1985, Month::August, 28, 1, 2, 3);
@@ -223,5 +235,21 @@ pub mod test {
         assert_eq!(1, parts.hour);
         assert_eq!(2, parts.minute);
         assert_eq!(3, parts.second);
+    }
+
+    #[test]
+    fn add() {
+        let dt = DateTime::new(2021, Month::January, 15, 8, 0, 0);
+
+        assert_eq!(DateTime::new(2021, Month::January, 15, 7, 0, 0), dt + TimeSpan::<TestTick>::from_hours(-1));
+        assert_eq!(DateTime::new(2021, Month::January, 15, 9, 0, 0), dt + TimeSpan::<TestTick>::from_hours(1));
+    }
+
+    #[test]
+    fn sub() {
+        let dt = DateTime::new(2021, Month::January, 15, 8, 0, 0);
+
+        assert_eq!(DateTime::new(2021, Month::January, 15, 7, 0, 0), dt - TimeSpan::<TestTick>::from_hours(1));
+        assert_eq!(DateTime::new(2021, Month::January, 15, 9, 0, 0), dt - TimeSpan::<TestTick>::from_hours(-1));
     }
 }

@@ -6,6 +6,7 @@ use core::{
 
 use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
+use core::convert::TryFrom;
 
 #[async_trait]
 pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
@@ -26,7 +27,7 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
     fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop>;
 
     async fn sleep(&mut self, mut base: u32, duration: TimeSpan<T>) {
-        let mut remaining = duration.0;
+        let mut remaining = u64::try_from(duration.0).expect("duration must be non negative");
 
         // The maximum delay is half the counters increment.
         // This ensures that we can hit the actual fire time directly when the last timeout is setup.
