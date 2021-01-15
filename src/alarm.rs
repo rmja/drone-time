@@ -23,13 +23,8 @@ pub struct Alarm<
     counter: Counter,
     timer: Arc<RefCell<Timer>>,
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
-    state: Arc<Mutex<SharedState<Timer, T, A>>>,
-}
-
-struct SharedState<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
-    subscriptions: VecDeque<Subscription<T>>,
+    subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
     adapter: PhantomData<A>,
-    timer: PhantomData<Timer>,
 }
 
 pub struct Subscription<T: Tick> {
@@ -118,11 +113,8 @@ impl<
             counter,
             timer: Arc::new(RefCell::new(timer)),
             running: Arc::new(AtomicOptionBox::new(None)),
-            state: Arc::new(Mutex::new(SharedState {
-                subscriptions: VecDeque::new(),
-                adapter: PhantomData,
-                timer: PhantomData,
-            })),
+            subscriptions: Arc::new(Mutex::new(VecDeque::new())),
+            adapter: PhantomData
         }
     }
 
@@ -147,20 +139,19 @@ impl<
             shared: sub_state.clone(),
         };
 
-        let mutex = self.state.clone();
-        let mut shared = mutex.try_lock().unwrap();
+        let mut subs = self.subscriptions.try_lock().unwrap();
 
         // Remove all subscriptions that are in the `DROPPED` state.
-        shared.remove_dropped();
+        subs.remove_dropped();
 
         // Find the position where the new subscription should be added and insert.
-        let index = shared.get_insert_index(duration);
-        shared.subscriptions.insert(index, sub);
+        let index = subs.get_insert_index(duration);
+        subs.insert(index, sub);
 
         if index == 0 {
             // It turns out that this subscription is the next in line.
 
-            let future = Self::create_future(self.timer.clone(), self.running.clone(), self.state.clone(), base, duration);
+            let future = Self::create_future(self.timer.clone(), self.running.clone(), self.subscriptions.clone(), base, duration);
 
             let running = self.running.clone();
             running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
@@ -172,7 +163,7 @@ impl<
     async fn create_future(
         timer: Arc<RefCell<Timer>>,
         running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
-        state: Arc<Mutex<SharedState<Timer, T, A>>>,
+        subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
         base: u32,
         duration: TimeSpan<T>,
     ) {
@@ -180,13 +171,13 @@ impl<
         let timer = timer.clone();
         t.sleep(base, duration)
             .then(move |_| {
-                let mut shared = state.try_lock().unwrap();
+                let mut subs = subscriptions.try_lock().unwrap();
 
                 // Remove all subscriptions that are in the `DROPPED` state.
-                shared.remove_dropped();
+                subs.remove_dropped();
 
                 // Set the remaining time for each subscription.
-                for s in shared.subscriptions.iter_mut() {
+                for s in subs.iter_mut() {
                     s.remaining -= duration;
 
                     if s.remaining.0 == 0 {
@@ -202,15 +193,15 @@ impl<
                 }
 
                 // Remove all subscriptions that have remaining == 0.
-                shared.subscriptions.retain(|x| x.remaining.0 > 0);
+                subs.retain(|x| x.remaining.0 > 0);
 
-                if let Some(next) = shared.subscriptions.front() {
+                if let Some(next) = subs.front() {
                     // Create a future for the next subscription in line.
 
                     let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
 
-                    let future = Self::create_future(timer, running.clone(), state.clone(), base, duration);
+                    let future = Self::create_future(timer, running.clone(), subscriptions.clone(), base, duration);
                     running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
                 } else {
                     running.take(Ordering::AcqRel);
@@ -221,10 +212,15 @@ impl<
     }
 }
 
-impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, T, A> {
+trait VecDequeExt<T: Tick> {
+    fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize;
+    fn remove_dropped(&mut self);
+}
+
+impl<T: Tick> VecDequeExt<T> for VecDeque<Subscription<T>> {
     fn get_insert_index(&self, remaining: TimeSpan<T>) -> usize {
         let mut index = 0;
-        for sub in self.subscriptions.iter() {
+        for sub in self.iter() {
             if remaining < sub.remaining {
                 break;
             }
@@ -234,8 +230,7 @@ impl<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> SharedState<Timer, 
     }
 
     fn remove_dropped(&mut self) {
-        self.subscriptions
-            .retain(|x| x.shared.state.load(Ordering::Relaxed) != DROPPED);
+        self.retain(|x| x.shared.state.load(Ordering::Relaxed) != DROPPED);
     }
 }
 
