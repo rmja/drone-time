@@ -66,10 +66,8 @@ impl Future for SubscriptionGuard {
         if let Some(mut future) = running.take(Ordering::AcqRel) {
             if future.poll_unpin(cx).is_pending() {
                 // The timer is currently running - there is no chance that we could have completed.
-                // FIXME: Only set if None - it may be that the timer has scheduled a new future, and we do not want to override that one.
-                running.swap(Some(future), Ordering::AcqRel);
-
-                // return Poll::Pending;
+                // Set the future back if not assigned to some earlier timeout.
+                running.try_store(future, Ordering::Release);
             }
         }
 
@@ -78,8 +76,7 @@ impl Future for SubscriptionGuard {
 
         // Copy the waker to the subscription so that we can wake it when it is time.
         // TODO: Use store() when available in atomicbox.
-        // shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
-        let _ = shared.waker.swap(Some(Box::new(waker)), Ordering::AcqRel);
+        shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
         let old = shared.state.swap(WAKEABLE, Ordering::AcqRel);
@@ -166,7 +163,7 @@ impl<
             let future = Self::create_future(self.timer.clone(), self.running.clone(), self.state.clone(), base, duration);
 
             let running = self.running.clone();
-            running.swap(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
+            running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
         }
 
         SubscriptionGuard { running: self.running.clone(), shared: sub_state }
@@ -214,7 +211,7 @@ impl<
                     let duration = next.remaining;
 
                     let future = Self::create_future(timer, running.clone(), state.clone(), base, duration);
-                    running.swap(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
+                    running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
                 } else {
                     running.take(Ordering::AcqRel);
                 }

@@ -32,7 +32,7 @@ drone-cortexm = { version = "0.14.0", path = "../drone-cortexm", optional = true
 drone-stm32-map = { version = "0.14.0", features = ["tim"], path = "../drone-stm32-map", optional = true }
 futures = { version = "0.3.0", default-features = false }
 async-trait = "0.1"
-atomicbox = { git="https://github.com/tomaka/atomicbox", branch="no-std"}
+atomicbox = { git="https://github.com/rmja/atomicbox" }
 
 [dev-dependencies]
 futures-await-test = "0.3.0"
