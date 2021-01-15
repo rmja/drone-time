@@ -31,7 +31,7 @@ pub struct Subscription<T: Tick> {
     /// The remaining duration until the future is resolved.
     remaining: TimeSpan<T>,
     /// Shared state related to the subscription.
-    shared: Arc<SubscriptionState>,
+    state: Arc<SubscriptionState>,
 }
 
 /// The state related to a subscription.
@@ -45,7 +45,7 @@ struct SubscriptionState {
 
 pub struct SubscriptionGuard {
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
-    shared: Arc<SubscriptionState>,
+    state: Arc<SubscriptionState>,
 }
 
 impl SubscriptionState {
@@ -69,7 +69,7 @@ impl Future for SubscriptionGuard {
             }
         }
 
-        let shared = self.shared.clone();
+        let shared = self.state.clone();
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
@@ -96,7 +96,7 @@ impl Future for SubscriptionGuard {
 
 impl Drop for SubscriptionGuard {
     fn drop(&mut self) {
-        self.shared.value.store(SubscriptionState::DROPPED, Ordering::Release);
+        self.state.value.store(SubscriptionState::DROPPED, Ordering::Release);
     }
 }
 
@@ -138,7 +138,7 @@ impl<
         });
         let sub = Subscription {
             remaining: duration,
-            shared: sub_state.clone(),
+            state: sub_state.clone(),
         };
 
         let mut subs = self.subscriptions.try_lock().unwrap();
@@ -159,7 +159,7 @@ impl<
             running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
         }
 
-        SubscriptionGuard { running: self.running.clone(), shared: sub_state }
+        SubscriptionGuard { running: self.running.clone(), state: sub_state }
     }
 
     async fn create_future(
@@ -184,12 +184,12 @@ impl<
 
                     if s.remaining.0 == 0 {
                         // Wake the future for the subscription.
-                        let old = s.shared.value.swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
+                        let old = s.state.value.swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
                         if old == SubscriptionState::WAKEABLE {
-                            let waker = s.shared.waker.take(Ordering::AcqRel).unwrap();
+                            let waker = s.state.waker.take(Ordering::AcqRel).unwrap();
                             waker.wake();
                         } else if old == SubscriptionState::DROPPED {
-                            s.shared.value.store(SubscriptionState::DROPPED, Ordering::Release);
+                            s.state.value.store(SubscriptionState::DROPPED, Ordering::Release);
                         }
                     }
                 }
@@ -232,7 +232,7 @@ impl<T: Tick> VecDequeExt<T> for VecDeque<Subscription<T>> {
     }
 
     fn remove_dropped(&mut self) {
-        self.retain(|x| x.shared.value.load(Ordering::Relaxed) != SubscriptionState::DROPPED);
+        self.retain(|x| x.state.value.load(Ordering::Relaxed) != SubscriptionState::DROPPED);
     }
 }
 
