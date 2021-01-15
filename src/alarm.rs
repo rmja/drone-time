@@ -22,7 +22,7 @@ pub struct Alarm<
 > {
     counter: Counter,
     timer: Arc<RefCell<Timer>>,
-    running: Arc<Mutex<Pin<Box<dyn Future<Output = ()>>>>>,
+    running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
     state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
@@ -46,7 +46,6 @@ struct SubscriptionShared {
     state: AtomicUsize,
     /// The waker to be invoked when the future should complete.
     waker: AtomicOptionBox<Waker>,
-    // timer_future: AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>,
 }
 
 const ADDED: usize = 0;
@@ -55,7 +54,7 @@ const COMPLETED: usize = 2;
 const DROPPED: usize = 3;
 
 pub struct SubscriptionGuard {
-    running: Arc<Mutex<Pin<Box<dyn Future<Output = ()>>>>>,
+    running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
     shared: Arc<SubscriptionShared>,
 }
 
@@ -64,11 +63,13 @@ impl Future for SubscriptionGuard {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let running = self.running.clone();
-
-        if let Some(mut running) = running.try_lock() {
-            if running.poll_unpin(cx).is_pending() {
+        if let Some(mut future) = running.take(Ordering::AcqRel) {
+            if future.poll_unpin(cx).is_pending() {
                 // The timer is currently running - there is no chance that we could have completed.
-                return Poll::Pending;
+                // FIXME: Only set if None - it may be that the timer has scheduled a new future, and we do not want to override that one.
+                running.swap(Some(future), Ordering::AcqRel);
+
+                // return Poll::Pending;
             }
         }
 
@@ -119,7 +120,7 @@ impl<
         Self {
             counter,
             timer: Arc::new(RefCell::new(timer)),
-            running: Arc::new(Mutex::new(future::ready(()).fuse().boxed_local())),
+            running: Arc::new(AtomicOptionBox::new(None)),
             state: Arc::new(Mutex::new(SharedState {
                 subscriptions: VecDeque::new(),
                 adapter: PhantomData,
@@ -162,8 +163,10 @@ impl<
         if index == 0 {
             // It turns out that this subscription is the next in line.
 
-            let mut writer = self.running.try_lock().unwrap();
-            *writer = Self::create_future(self.timer.clone(), self.state.clone(), base, duration).fuse().boxed_local();
+            let future = Self::create_future(self.timer.clone(), self.running.clone(), self.state.clone(), base, duration);
+
+            let running = self.running.clone();
+            running.swap(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
         }
 
         SubscriptionGuard { running: self.running.clone(), shared: sub_state }
@@ -171,6 +174,7 @@ impl<
 
     async fn create_future(
         timer: Arc<RefCell<Timer>>,
+        running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
         state: Arc<Mutex<SharedState<Timer, T, A>>>,
         base: u32,
         duration: TimeSpan<T>,
@@ -208,10 +212,11 @@ impl<
 
                     let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
-                    let future = Self::create_future(timer, state.clone(), base, duration);
-                    // shared.future = Some(future.boxed_local());
+
+                    let future = Self::create_future(timer, running.clone(), state.clone(), base, duration);
+                    running.swap(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
                 } else {
-                    // shared.future = None;
+                    running.take(Ordering::AcqRel);
                 }
 
                 future::ready(())

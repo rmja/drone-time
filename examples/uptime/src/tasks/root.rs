@@ -88,19 +88,20 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let mut alarm = Alarm::new(alarm_counter, alarm_timer);
 
-    let f1 = alarm.sleep(TimeSpan::from_secs(2)).then(|_| {
-        println!("2 seconds passed");
+    let f1 = alarm.sleep(TimeSpan::from_secs(6)).then(|_| {
+        println!("6 seconds passed");
         future::ready(())
     });
-    // let f2 = alarm.sleep(TimeSpan::from_secs(4)).then(|_| {
-    //     println!("4 seconds passed");
-    //     future::ready(())
-    // });
-    // let f3 = alarm.sleep(TimeSpan::from_secs(8)).then(|_| {
-    //     println!("8 seconds passed");
-    //     future::ready(())
-    // });
+    let f2 = alarm.sleep(TimeSpan::from_secs(4)).then(|_| {
+        println!("4 seconds passed");
+        future::ready(())
+    });
+    let f3 = alarm.sleep(TimeSpan::from_secs(8)).then(|_| {
+        println!("8 seconds passed");
+        future::ready(())
+    });
 
-    f1.root_wait();
-    // future::join3(f1, f2, f3).root_wait();
+    println!("Starting sleep");
+    future::join3(f1, f2, f3).root_wait();
+    println!("All done");
 }
