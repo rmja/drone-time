@@ -135,8 +135,7 @@ impl<T: Tick> TimeSpan<T> {
         assert!(self.0 != Self::MIN.0, "Overflow!");
         if self.0 >= 0 {
             Self(self.0, PhantomData)
-        }
-        else {
+        } else {
             Self(-self.0, PhantomData)
         }
     }

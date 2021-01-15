@@ -1,5 +1,5 @@
 #![feature(asm)]
-#![feature(const_fn)] 
+#![feature(const_fn)]
 #![feature(const_panic)]
 #![feature(never_type)]
 #![feature(prelude_import)]
@@ -20,7 +20,7 @@ mod watch;
 pub use self::{
     adapters::alarm::{AlarmTimer, AlarmTimerNext, AlarmTimerStop},
     adapters::tick::Tick,
-    adapters::uptime::UptimeAlarm,
+    adapters::uptime::UptimeTimer,
     alarm::Alarm,
     datetime::{DateTime, Month},
     timeout::Timeout,

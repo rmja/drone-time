@@ -162,8 +162,7 @@ impl<T: Tick> Add<TimeSpan<T>> for DateTime {
     fn add(self, rhs: TimeSpan<T>) -> Self::Output {
         if rhs.0 >= 0 {
             DateTime(self.0 + rhs.as_secs() as u32)
-        }
-        else {
+        } else {
             DateTime(self.0 - (-rhs.as_secs()) as u32)
         }
     }
@@ -175,8 +174,7 @@ impl<T: Tick> Sub<TimeSpan<T>> for DateTime {
     fn sub(self, rhs: TimeSpan<T>) -> Self::Output {
         if rhs.0 >= 0 {
             DateTime(self.0 - rhs.as_secs() as u32)
-        }
-        else {
+        } else {
             DateTime(self.0 + (-rhs.as_secs()) as u32)
         }
     }
@@ -241,15 +239,27 @@ pub mod test {
     fn add() {
         let dt = DateTime::new(2021, Month::January, 15, 8, 0, 0);
 
-        assert_eq!(DateTime::new(2021, Month::January, 15, 7, 0, 0), dt + TimeSpan::<TestTick>::from_hours(-1));
-        assert_eq!(DateTime::new(2021, Month::January, 15, 9, 0, 0), dt + TimeSpan::<TestTick>::from_hours(1));
+        assert_eq!(
+            DateTime::new(2021, Month::January, 15, 7, 0, 0),
+            dt + TimeSpan::<TestTick>::from_hours(-1)
+        );
+        assert_eq!(
+            DateTime::new(2021, Month::January, 15, 9, 0, 0),
+            dt + TimeSpan::<TestTick>::from_hours(1)
+        );
     }
 
     #[test]
     fn sub() {
         let dt = DateTime::new(2021, Month::January, 15, 8, 0, 0);
 
-        assert_eq!(DateTime::new(2021, Month::January, 15, 7, 0, 0), dt - TimeSpan::<TestTick>::from_hours(1));
-        assert_eq!(DateTime::new(2021, Month::January, 15, 9, 0, 0), dt - TimeSpan::<TestTick>::from_hours(-1));
+        assert_eq!(
+            DateTime::new(2021, Month::January, 15, 7, 0, 0),
+            dt - TimeSpan::<TestTick>::from_hours(1)
+        );
+        assert_eq!(
+            DateTime::new(2021, Month::January, 15, 9, 0, 0),
+            dt - TimeSpan::<TestTick>::from_hours(-1)
+        );
     }
 }

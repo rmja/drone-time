@@ -1,6 +1,6 @@
-/// The alarm backing Uptime.
-/// The timer must be monotonically increasing in the interval 0 <= counter() <= counter_max().
-pub trait UptimeAlarm<A>: Sync {
+/// The timer backing Uptime.
+/// The timer must be monotonically increasing in the interval 0 <= counter() <= MAX.
+pub trait UptimeTimer<A>: Sync {
     /// The maximum counter value.
     const MAX: u32;
 

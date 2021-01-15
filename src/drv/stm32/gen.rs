@@ -1,4 +1,4 @@
-use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, Tick, UptimeAlarm};
+use crate::{AlarmTimer, AlarmTimerNext, AlarmTimerStop, Tick, UptimeTimer};
 use core::convert::TryFrom;
 use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::tim::general::{
@@ -53,7 +53,7 @@ pub trait NewGeneralCh4<Tim: GeneralTimMap, Int: IntToken> {
 }
 
 impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, Int: IntToken, Ch: TimCh<Tim>>
-    UptimeAlarm<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
+    UptimeTimer<GeneralTimDrv<Tim, Int, Ch>> for GeneralTimDrv<Tim, Int, Ch>
 {
     const MAX: u32 = 0xFFFF;
 

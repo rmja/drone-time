@@ -52,7 +52,7 @@ pub mod tests {
         token::Token,
     };
 
-    use crate::{Month, UptimeAlarm, UptimeDrv};
+    use crate::{Month, UptimeDrv, UptimeTimer};
 
     use super::*;
 
@@ -75,7 +75,7 @@ pub mod tests {
         const FREQ: u32 = 32768;
     }
 
-    impl UptimeAlarm<TestTick> for TestAlarm {
+    impl UptimeTimer<TestTick> for TestAlarm {
         const MAX: u32 = 0xFFFF;
 
         fn start(&self) {}
