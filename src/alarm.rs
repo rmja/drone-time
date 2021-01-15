@@ -31,26 +31,28 @@ pub struct Subscription<T: Tick> {
     /// The remaining duration until the future is resolved.
     remaining: TimeSpan<T>,
     /// Shared state related to the subscription.
-    shared: Arc<SubscriptionShared>,
+    shared: Arc<SubscriptionState>,
 }
 
 /// The state related to a subscription.
 /// It is basically an enum where `waker` is only defined if state is `WAKEABLE`.
-struct SubscriptionShared {
+struct SubscriptionState {
     /// The subscription state (ADDED, WAKEABLE, COMPLETED, DROPPED).
-    state: AtomicUsize,
+    value: AtomicUsize,
     /// The waker to be invoked when the future should complete.
     waker: AtomicOptionBox<Waker>,
 }
 
-const ADDED: usize = 0;
-const WAKEABLE: usize = 1;
-const COMPLETED: usize = 2;
-const DROPPED: usize = 3;
-
 pub struct SubscriptionGuard {
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
-    shared: Arc<SubscriptionShared>,
+    shared: Arc<SubscriptionState>,
+}
+
+impl SubscriptionState {
+    const ADDED: usize = 0;
+    const WAKEABLE: usize = 1;
+    const COMPLETED: usize = 2;
+    const DROPPED: usize = 3;
 }
 
 impl Future for SubscriptionGuard {
@@ -74,13 +76,13 @@ impl Future for SubscriptionGuard {
         shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
-        let old = shared.state.swap(WAKEABLE, Ordering::AcqRel);
-        assert!(old != DROPPED);
-        if old == COMPLETED {
+        let old = shared.value.swap(SubscriptionState::WAKEABLE, Ordering::AcqRel);
+        assert!(old != SubscriptionState::DROPPED);
+        if old == SubscriptionState::COMPLETED {
             // Timeout has already occured.
 
             // Set the state back to COMPLETED.
-            shared.state.store(COMPLETED, Ordering::Release);
+            shared.value.store(SubscriptionState::COMPLETED, Ordering::Release);
 
             // Remove the waker that we just assigned - it turns out that it was not needed as we are about to return `Ready`.
             shared.waker.take(Ordering::AcqRel);
@@ -94,7 +96,7 @@ impl Future for SubscriptionGuard {
 
 impl Drop for SubscriptionGuard {
     fn drop(&mut self) {
-        self.shared.state.store(DROPPED, Ordering::Release);
+        self.shared.value.store(SubscriptionState::DROPPED, Ordering::Release);
     }
 }
 
@@ -130,8 +132,8 @@ impl<
 
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
-        let sub_state = Arc::new(SubscriptionShared {
-            state: AtomicUsize::new(ADDED),
+        let sub_state = Arc::new(SubscriptionState {
+            value: AtomicUsize::new(SubscriptionState::ADDED),
             waker: AtomicOptionBox::new(None),
         });
         let sub = Subscription {
@@ -182,12 +184,12 @@ impl<
 
                     if s.remaining.0 == 0 {
                         // Wake the future for the subscription.
-                        let old = s.shared.state.swap(COMPLETED, Ordering::AcqRel);
-                        if old == WAKEABLE {
+                        let old = s.shared.value.swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
+                        if old == SubscriptionState::WAKEABLE {
                             let waker = s.shared.waker.take(Ordering::AcqRel).unwrap();
                             waker.wake();
-                        } else if old == DROPPED {
-                            s.shared.state.store(DROPPED, Ordering::Release);
+                        } else if old == SubscriptionState::DROPPED {
+                            s.shared.value.store(SubscriptionState::DROPPED, Ordering::Release);
                         }
                     }
                 }
@@ -230,7 +232,7 @@ impl<T: Tick> VecDequeExt<T> for VecDeque<Subscription<T>> {
     }
 
     fn remove_dropped(&mut self) {
-        self.retain(|x| x.shared.state.load(Ordering::Relaxed) != DROPPED);
+        self.retain(|x| x.shared.value.load(Ordering::Relaxed) != SubscriptionState::DROPPED);
     }
 }
 
