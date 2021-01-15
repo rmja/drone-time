@@ -8,7 +8,10 @@ use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 
-pub trait AlarmCounter<T: Tick, A> where Self: Sync {
+pub trait AlarmCounter<T: Tick, A>
+where
+    Self: Sync,
+{
     /// Get the current counter value of the timer.
     fn value(&self) -> u32;
 }
@@ -23,29 +26,31 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
 
     /// The timer period.
     const PERIOD: u64 = Self::MAX as u64 + 1;
+    const HALF_PERIOD: u32 = (Self::PERIOD / 2) as u32;
 
     /// Returns a future that resolves when the timer counter is equal to `compare`.
     /// Note that compare is not a duration but an absolute timestamp.
-    fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop>;
+    /// The returned future is resolved immediately if `soon` and
+    /// the compare value has already passed with at most `PERIOD/2` ticks.
+    fn next(&mut self, compare: u32, soon: bool) -> AlarmTimerNext<'_, Self::Stop>;
 
     async fn sleep(&mut self, mut base: u32, duration: TimeSpan<T>) {
         let mut remaining = u64::try_from(duration.0).expect("duration must be non negative");
+        let soon = remaining < Self::PERIOD / 2;
 
         // The maximum delay is half the counters increment.
         // This ensures that we can hit the actual fire time directly when the last timeout is setup.
-        let half_period = (Self::PERIOD / 2) as u32;
-
         while remaining >= Self::PERIOD {
             // We can setup the final time
-            let compare = Self::counter_add(base, half_period);
-            self.next(compare).await;
+            let compare = Self::counter_add(base, Self::HALF_PERIOD);
+            self.next(compare, false).await;
             base = compare;
-            remaining -= half_period as u64;
+            remaining -= Self::HALF_PERIOD as u64;
         }
 
         if remaining > 0 {
             let compare = Self::counter_add(base, remaining as u32);
-            self.next(compare).await;
+            self.next(compare, soon).await;
         }
     }
 

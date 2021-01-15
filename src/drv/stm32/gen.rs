@@ -4,6 +4,7 @@ use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::tim::general::{
     traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir,
 };
+use futures::future;
 
 use super::gen_ch::TimCh;
 
@@ -33,6 +34,7 @@ pub struct AlarmTimerDrv<Tim: GeneralTimMap, Int: IntToken, Ch: TimCh<Tim>> {
     tim_int: Int,
     tim_dier: Tim::CTimDier,
     tim_sr: Tim::CTimSr,
+    tim_cnt: Tim::CTimCnt,
     tim_ccr: Ch::STimCcr,
 }
 
@@ -73,6 +75,7 @@ impl<
                 tim_int,
                 tim_dier: tim.tim_dier,
                 tim_sr: tim.tim_sr,
+                tim_cnt: tim.tim_cnt,
                 tim_ccr: tim.tim_ccr,
             },
             tick: PhantomData,
@@ -168,10 +171,10 @@ impl<
     type Stop = Self;
     const MAX: u32 = 0xFFFF;
 
-    fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+    fn next(&mut self, compare: u32, soon: bool) -> AlarmTimerNext<'_, Self::Stop> {
         let tim_sr = self.tim_sr;
         let tim_dier = self.tim_dier;
-        let future = Box::pin(self.tim_int.add_future(fib::new_fn(move || {
+        let timeout_future = self.tim_int.add_future(fib::new_fn(move || {
             if Ch::is_pending(tim_sr) {
                 Ch::clear_pending(tim_sr);
                 Ch::disable_interrupt(tim_dier);
@@ -179,12 +182,32 @@ impl<
             } else {
                 fib::Yielded(())
             }
-        })));
+        }));
 
-        Ch::set_compare(&self.tim_ccr, u16::try_from(compare).unwrap());
-        Ch::enable_interrupt(self.tim_dier);
+        let compare = u16::try_from(compare).unwrap();
+        Ch::set_compare(&self.tim_ccr, compare);
 
-        AlarmTimerNext::new(self, future)
+        let already_passed = if soon {
+            // Sample counter after interrupt is setup.
+            let counter = self.tim_cnt.cnt().read_bits() as u16;
+
+            // Let's see if counter is later than compare in which case the time has already elapsed
+            counter.wrapping_sub(compare) > 0x8000
+        } else {
+            false
+        };
+
+        if already_passed {
+            // The counter has already passed the comfigured compare value - skip interrupt
+            drop(timeout_future);
+            Ch::clear_pending(tim_sr);
+
+            AlarmTimerNext::new(self, Box::pin(future::ready(())))
+        } else {
+            Ch::enable_interrupt(self.tim_dier);
+
+            AlarmTimerNext::new(self, Box::pin(timeout_future))
+        }
     }
 }
 
