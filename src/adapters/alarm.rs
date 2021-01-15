@@ -8,7 +8,7 @@ use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 
-pub trait AlarmCounter<T: Tick, A>: Sync {
+pub trait AlarmCounter<T: Tick, A> where Self: Sync {
     /// Get the current counter value of the timer.
     fn value(&self) -> u32;
 }

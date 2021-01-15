@@ -15,18 +15,18 @@ use futures::prelude::*;
 
 /// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<
-    Counter: AlarmCounter<T, A>,
+    Counter: AlarmCounter<T, A> + 'static,
     Timer: AlarmTimer<T, A>,
     T: Tick + 'static,
     A: 'static,
 > {
     counter: Counter,
-    timer: Arc<Mutex<Timer>>,
+    timer: Arc<RefCell<Timer>>,
+    running: Arc<Mutex<Pin<Box<dyn Future<Output = ()>>>>>,
     state: Arc<Mutex<SharedState<Timer, T, A>>>,
 }
 
 struct SharedState<Timer: AlarmTimer<T, A>, T: Tick + 'static, A: 'static> {
-    future: Option<Pin<Box<dyn Future<Output = ()>>>>,
     subscriptions: VecDeque<Subscription<T>>,
     adapter: PhantomData<A>,
     timer: PhantomData<Timer>,
@@ -46,6 +46,7 @@ struct SubscriptionShared {
     state: AtomicUsize,
     /// The waker to be invoked when the future should complete.
     waker: AtomicOptionBox<Waker>,
+    // timer_future: AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>,
 }
 
 const ADDED: usize = 0;
@@ -54,6 +55,7 @@ const COMPLETED: usize = 2;
 const DROPPED: usize = 3;
 
 pub struct SubscriptionGuard {
+    running: Arc<Mutex<Pin<Box<dyn Future<Output = ()>>>>>,
     shared: Arc<SubscriptionShared>,
 }
 
@@ -61,6 +63,15 @@ impl Future for SubscriptionGuard {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let running = self.running.clone();
+
+        if let Some(mut running) = running.try_lock() {
+            if running.poll_unpin(cx).is_pending() {
+                // The timer is currently running - there is no chance that we could have completed.
+                return Poll::Pending;
+            }
+        }
+
         let shared = self.shared.clone();
         let waker = cx.waker().clone();
 
@@ -95,7 +106,7 @@ impl Drop for SubscriptionGuard {
 }
 
 impl<
-        Counter: AlarmCounter<T, A>,
+        Counter: AlarmCounter<T, A> + 'static,
         Timer: AlarmTimer<T, A> + 'static,
         T: Tick + 'static,
         A: Send + 'static,
@@ -107,9 +118,9 @@ impl<
     pub fn new(counter: Counter, timer: Timer) -> Self {
         Self {
             counter,
-            timer: Arc::new(Mutex::new(timer)),
+            timer: Arc::new(RefCell::new(timer)),
+            running: Arc::new(Mutex::new(future::ready(()).fuse().boxed_local())),
             state: Arc::new(Mutex::new(SharedState {
-                future: None,
                 subscriptions: VecDeque::new(),
                 adapter: PhantomData,
                 timer: PhantomData,
@@ -150,12 +161,12 @@ impl<
 
         if index == 0 {
             // It turns out that this subscription is the next in line.
-            // let future =
-            //     Self::create_future(self.timer.clone(), self.state.clone(), base, duration);
-            // shared.future = Some(future.boxed_local());
+
+            let mut writer = self.running.try_lock().unwrap();
+            *writer = Self::create_future(self.timer.clone(), self.state.clone(), base, duration).fuse().boxed_local();
         }
 
-        SubscriptionGuard { shared: sub_state }
+        SubscriptionGuard { running: self.running.clone(), shared: sub_state }
     }
 
     async fn create_future(
@@ -197,15 +208,14 @@ impl<
 
                     let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
-                    // let future = Self::create_future(timer, state.clone(), base, duration);
+                    let future = Self::create_future(timer, state.clone(), base, duration);
                     // shared.future = Some(future.boxed_local());
                 } else {
-                    shared.future = None;
+                    // shared.future = None;
                 }
 
                 future::ready(())
-            })
-            .await;
+            }).await;
     }
 }
 
