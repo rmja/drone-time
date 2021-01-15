@@ -75,7 +75,6 @@ impl Future for SubscriptionGuard {
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
-        // TODO: Use store() when available in atomicbox.
         shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
