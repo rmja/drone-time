@@ -13,7 +13,7 @@ use atomicbox::AtomicOptionBox;
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
-/// An alarm is backed by a timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
+/// An alarm is backed by a single hardware timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct Alarm<
     Counter: AlarmCounter<T, A> + 'static,
     Timer: AlarmTimer<T, A>,
