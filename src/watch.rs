@@ -1,3 +1,5 @@
+use alloc::sync::Arc;
+
 use crate::{DateTime, Tick, TimeSpan, Uptime};
 
 struct Adjust<T: Tick> {
@@ -8,13 +10,13 @@ struct Adjust<T: Tick> {
 #[derive(Debug)]
 pub struct NotSetError;
 
-pub struct Watch<'a, U: Uptime<T>, T: Tick> {
-    uptime: &'a U,
+pub struct Watch<U: Uptime<T>, T: Tick> {
+    uptime: Arc<U>,
     adjust: Option<Adjust<T>>,
 }
 
-impl<'a, U: Uptime<T>, T: Tick> Watch<'a, U, T> {
-    pub fn new(uptime: &'a U) -> Self {
+impl<U: Uptime<T>, T: Tick> Watch<U, T> {
+    pub fn new(uptime: Arc<U>) -> Self {
         Self {
             uptime,
             adjust: None,

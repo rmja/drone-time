@@ -19,15 +19,15 @@ impl<Tim: GeneralTimMap, T: Tick> UptimeCounter<T, Adapter> for GeneralTimCntDrv
 
 impl<Tim: GeneralTimMap, Int: IntToken> UptimeOverflow<Adapter> for GeneralTimOvfDrv<Tim, Int> {
     fn overflow_int_enable(&self) {
-        self.int_enable();
+        TimerOverflow::int_enable(self);
     }
 
     fn is_pending_overflow(&self) -> bool {
-        self.is_pending()
+        TimerOverflow::is_pending(self)
     }
 
     fn clear_pending_overflow(&self) {
-        self.clear_pending();
+        TimerOverflow::clear_pending(self);
     }
 }
 

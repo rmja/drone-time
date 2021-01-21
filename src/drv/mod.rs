@@ -1,12 +1,14 @@
 #[cfg(feature = "systick")]
-pub mod systick;
+mod systick;
 
 #[cfg(feature = "stm32f4")]
-pub mod stm32f4;
+mod stm32f4;
 
 #[cfg(feature = "systick-experimental")]
 mod systick_experimental;
+
+#[cfg(feature = "systick")]
+pub use self::systick::SysTickDrv;
+
 #[cfg(feature = "systick-experimental")]
-pub mod systick {
-    pub use crate::drv::systick_experimental::*;
-}
+pub use self::systick_experimental::SysTickDrv;

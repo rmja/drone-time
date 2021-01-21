@@ -1,27 +1,38 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Tick, UptimeCounter, UptimeOverflow};
+use alloc::sync::Arc;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
-pub struct SysTickDrv(SysTickPeriph, AtomicBool);
+/// A cortex SysTick driver.
+pub struct SysTickDrv {
+    /// The timer counter.
+    pub counter: SysTickCntDrv,
+    /// The timer overflow control.
+    pub overflow: SysTickOvfDrv,
+}
+pub struct SysTickCntDrv(Arc<SysTickPeriph>);
+pub struct SysTickOvfDrv(Arc<SysTickPeriph>, AtomicBool);
 
 impl SysTickDrv {
     pub fn new(systick: SysTickPeriph) -> Self {
-        Self(systick, AtomicBool::new(false))
+        // Configure reload value.
+        systick.stk_load.store(|r| r.write_reload(0xFFFFFF));
+
+        let systick = Arc::new(systick);
+        Self {
+            counter: SysTickCntDrv(systick.clone()),
+            overflow: SysTickOvfDrv(systick, AtomicBool::new(false)),
+        }
     }
 
     pub fn start(&mut self) {
-        // Enable timer
-        self.0.stk_load.store(|r| r.write_reload(0xFFFFFF));
-
         // Start the counter in a multi-shot way
-        self.0.stk_ctrl.store(|r| r.set_enable());
+        self.counter.0.stk_ctrl.store(|r| r.set_enable());
     }
 }
 
-unsafe impl Sync for SysTickDrv {}
-
-impl<T: Tick> UptimeCounter<T, SysTickDrv> for SysTickDrv {
+impl<T: Tick> UptimeCounter<T, SysTickDrv> for SysTickCntDrv {
     const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
 
     fn value(&self) -> u32 {
@@ -30,7 +41,7 @@ impl<T: Tick> UptimeCounter<T, SysTickDrv> for SysTickDrv {
     }
 }
 
-impl UptimeOverflow<SysTickDrv> for SysTickDrv {
+impl UptimeOverflow<SysTickDrv> for SysTickOvfDrv {
     fn overflow_int_enable(&self) {
         // Counting down to 0 triggers the SysTick interrupt
         self.0.stk_ctrl.modify(|r| r.set_tickint());
