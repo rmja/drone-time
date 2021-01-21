@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Tick, UptimeCounter, UptimeOverflow};
-use drone_cortexm::{map::periph::sys_tick::{SysTickPeriph}, reg::prelude::*};
+use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
 

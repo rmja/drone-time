@@ -7,7 +7,12 @@ use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{Tick, TimeSpan, Uptime, UptimeCounter, UptimeOverflow};
 
-pub struct UptimeDrv<T: Tick, Counter: UptimeCounter<T, A>, Overflow: UptimeOverflow<A>, A: Send + Sync> {
+pub struct UptimeDrv<
+    T: Tick,
+    Counter: UptimeCounter<T, A>,
+    Overflow: UptimeOverflow<A>,
+    A: Send + Sync,
+> {
     tick: PhantomData<T>,
     counter: Counter,
     overflow: Overflow,
@@ -29,7 +34,12 @@ where
     A: Send + Sync + 'static,
 {
     /// Create a new Uptime driver.
-    pub fn new<TimerInt: ThrToken>(counter: Counter, overflow: Overflow, timer_int: TimerInt, _tick: T) -> Arc<impl Uptime<T>> {
+    pub fn new<TimerInt: ThrToken>(
+        counter: Counter,
+        overflow: Overflow,
+        timer_int: TimerInt,
+        _tick: T,
+    ) -> Arc<impl Uptime<T>> {
         let uptime = Arc::new(Self {
             tick: PhantomData,
             counter,

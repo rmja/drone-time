@@ -2,8 +2,7 @@ use crate::Tick;
 
 /// The counter backing Uptime.
 /// The timer counter must be monotonically increasing in the interval 0 <= value() <= MAX.
-pub trait UptimeCounter<T: Tick, A>: Send + Sync
-{
+pub trait UptimeCounter<T: Tick, A>: Send + Sync {
     /// The maximum counter value.
     const MAX: u32;
 
@@ -15,8 +14,7 @@ pub trait UptimeCounter<T: Tick, A>: Send + Sync
 }
 
 /// The overflow interrupt control backing Uptime.
-pub trait UptimeOverflow<A>: Send + Sync
-{
+pub trait UptimeOverflow<A>: Send + Sync {
     /// Enable timer overflow interrupt.
     fn overflow_int_enable(&self);
 

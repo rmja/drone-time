@@ -1,8 +1,11 @@
 use crate::{AlarmCounter, AlarmTimer, Tick, UptimeCounter, UptimeOverflow};
-use drone_cortexm::thr::IntToken;
-use drone_stm32f4_hal::tim::{DirCountUp, GeneralTimCh, GeneralTimChDrv, GeneralTimCntDrv, GeneralTimOvfDrv, OutputCompareMode, TimerCompareCh, TimerCounter, TimerOverflow};
-use drone_stm32_map::periph::tim::general::GeneralTimMap;
 use async_trait::async_trait;
+use drone_cortexm::thr::IntToken;
+use drone_stm32_map::periph::tim::general::GeneralTimMap;
+use drone_stm32f4_hal::tim::{
+    DirCountUp, GeneralTimCh, GeneralTimChDrv, GeneralTimCntDrv, GeneralTimOvfDrv,
+    OutputCompareMode, TimerCompareCh, TimerCounter, TimerOverflow,
+};
 
 pub struct Adapter;
 
@@ -35,7 +38,9 @@ impl<Tim: GeneralTimMap, T: Tick> AlarmCounter<T, Adapter> for GeneralTimCntDrv<
 }
 
 #[async_trait]
-impl<Tim: GeneralTimMap, Int: IntToken, Ch: GeneralTimCh<Tim> + 'static, T: Tick + 'static> AlarmTimer<T, Adapter> for GeneralTimChDrv<Tim, Int, Ch, OutputCompareMode> {
+impl<Tim: GeneralTimMap, Int: IntToken, Ch: GeneralTimCh<Tim> + 'static, T: Tick + 'static>
+    AlarmTimer<T, Adapter> for GeneralTimChDrv<Tim, Int, Ch, OutputCompareMode>
+{
     const MAX: u32 = 0xFFFF;
 
     async fn next(&mut self, compare: u32, soon: bool) {

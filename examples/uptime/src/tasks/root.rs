@@ -4,7 +4,10 @@ use crate::{adapters::*, consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32_map::periph::tim::periph_tim2;
-use drone_stm32f4_hal::{rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup}, tim::{GeneralTimCfg, GeneralTimSetup, prelude::*}};
+use drone_stm32f4_hal::{
+    rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup},
+    tim::{prelude::*, GeneralTimCfg, GeneralTimSetup},
+};
 use drone_time::{
     drv::stm32f4::*, drv::systick::SysTickDrv, Alarm, DateTime, TimeSpan, Uptime, UptimeDrv, Watch,
 };
@@ -56,8 +59,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         pclk1,
         TimFreq::Nominal(consts::TIM2_FREQ),
     );
-    let tim2 = GeneralTimCfg::with_enabled_clock(setup)
-        .ch1(|ch| ch.into_output_compare());
+    let tim2 = GeneralTimCfg::with_enabled_clock(setup).ch1(|ch| ch.into_output_compare());
 
     tim2.start();
 
