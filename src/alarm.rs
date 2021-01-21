@@ -116,7 +116,7 @@ impl<
     pub const MAX: u32 = Timer::MAX;
 
     /// Create a new `Alarm` backed by a hardware timer.
-    pub fn new(counter: Counter, timer: Timer) -> Self {
+    pub fn new(counter: Counter, timer: Timer, _tick: T) -> Self {
         Self {
             counter,
             timer: Arc::new(RefCell::new(timer)),

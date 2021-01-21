@@ -6,8 +6,7 @@ use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32_map::periph::tim::periph_tim2;
 use drone_stm32f4_hal::{rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup}, tim::{GeneralTimCfg, GeneralTimSetup, prelude::*}};
 use drone_time::{
-    drv::stm32::*, drv::systick::SysTickDrv, Alarm, DateTime, TimeSpan, Uptime, UptimeDrv,
-    UptimeTimer, Watch,
+    drv::stm32f4::*, drv::systick::SysTickDrv, Alarm, DateTime, TimeSpan, Uptime, UptimeDrv, Watch,
 };
 use futures::prelude::*;
 
@@ -57,33 +56,33 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         pclk1,
         TimFreq::Nominal(consts::TIM2_FREQ),
     );
-    let tim2 = GeneralTimCfg::with_enabled_clock(setup);
-    let tim2 = GeneralTimDrv::new_ch1(tim2.release(), thr.tim_2, Tim2Tick);
+    let tim2 = GeneralTimCfg::with_enabled_clock(setup)
+        .ch1(|ch| ch.into_output_compare());
 
-    let (uptime_timer, alarm_counter, alarm_timer) = tim2.split();
+    tim2.start();
 
-    let uptime = UptimeDrv::new(uptime_timer, thr.tim_2);
-    let mut alarm = Alarm::new(alarm_counter, alarm_timer);
+    let uptime = UptimeDrv::new(tim2.cnt.clone(), tim2.ovf, thr.tim_2, Tim2Tick);
+    let mut alarm = Alarm::new(tim2.cnt, tim2.ch1, Tim2Tick);
     let mut watch = Watch::new(&*uptime);
     watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 
-    let f1 = alarm.sleep(TimeSpan::from_secs(6)).then(|_| {
-        println!("{:?}", uptime.now());
-        println!("6 seconds passed");
-        future::ready(())
-    });
-    let f2 = alarm.sleep(TimeSpan::from_secs(4)).then(|_| {
-        println!("{:?}", uptime.now());
-        println!("4 seconds passed");
-        future::ready(())
-    });
-    let f3 = alarm.sleep(TimeSpan::from_secs(8)).then(|_| {
-        println!("{:?}", uptime.now());
-        println!("8 seconds passed");
-        future::ready(())
-    });
+    // let f1 = alarm.sleep(TimeSpan::from_secs(6)).then(|_| {
+    //     println!("{:?}", uptime.now());
+    //     println!("6 seconds passed");
+    //     future::ready(())
+    // });
+    // let f2 = alarm.sleep(TimeSpan::from_secs(4)).then(|_| {
+    //     println!("{:?}", uptime.now());
+    //     println!("4 seconds passed");
+    //     future::ready(())
+    // });
+    // let f3 = alarm.sleep(TimeSpan::from_secs(8)).then(|_| {
+    //     println!("{:?}", uptime.now());
+    //     println!("8 seconds passed");
+    //     future::ready(())
+    // });
 
-    future::join3(f1, f2, f3).root_wait();
+    // future::join3(f1, f2, f3).root_wait();
 
     let mut last = TimeSpan::ZERO;
     let mut last_seconds = i32::MAX;

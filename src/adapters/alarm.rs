@@ -1,9 +1,3 @@
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-
 use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
 use core::convert::TryFrom;
@@ -18,9 +12,6 @@ where
 
 #[async_trait]
 pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
-    /// AlarmTimer stop handler.
-    type Stop: AlarmTimerStop;
-
     /// The maximum counter value.
     const MAX: u32;
 
@@ -32,7 +23,7 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
     /// Note that compare is not a duration but an absolute timestamp.
     /// The returned future is resolved immediately if `soon` and
     /// the compare value has already passed with at most `PERIOD/2` ticks.
-    fn next(&mut self, compare: u32, soon: bool) -> AlarmTimerNext<'_, Self::Stop>;
+    async fn next(&mut self, compare: u32, soon: bool);
 
     async fn sleep(&mut self, mut base: u32, duration: TimeSpan<T>) {
         let mut remaining = u64::try_from(duration.0).expect("duration must be non negative");
@@ -58,40 +49,6 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
         assert!(base <= Self::MAX);
         assert!(duration <= Self::MAX);
         ((base as u64 + duration as u64) % Self::PERIOD) as u32
-    }
-}
-
-/// AlarmTimer stop handler.
-pub trait AlarmTimerStop: Send {
-    /// Stop the timer.
-    fn stop(&mut self);
-}
-
-pub struct AlarmTimerNext<'a, T: AlarmTimerStop> {
-    stop: &'a mut T,
-    future: Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
-}
-
-impl<'a, T: AlarmTimerStop> AlarmTimerNext<'a, T> {
-    /// Creates a new [`AlarmTimerNext`].
-    pub fn new(stop: &'a mut T, future: Pin<Box<dyn Future<Output = ()> + Send + 'a>>) -> Self {
-        Self { stop, future }
-    }
-}
-
-impl<'a, T: AlarmTimerStop> Future for AlarmTimerNext<'a, T> {
-    type Output = ();
-
-    #[inline]
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        self.future.as_mut().poll(cx)
-    }
-}
-
-impl<'a, T: AlarmTimerStop> Drop for AlarmTimerNext<'a, T> {
-    #[inline]
-    fn drop(&mut self) {
-        self.stop.stop();
     }
 }
 

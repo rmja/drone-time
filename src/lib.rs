@@ -18,9 +18,9 @@ mod uptime_drv;
 mod watch;
 
 pub use self::{
-    adapters::alarm::{AlarmCounter, AlarmTimer, AlarmTimerNext, AlarmTimerStop},
+    adapters::alarm::{AlarmCounter, AlarmTimer},
     adapters::tick::Tick,
-    adapters::uptime::UptimeTimer,
+    adapters::uptime::{UptimeCounter, UptimeOverflow},
     alarm::Alarm,
     datetime::{DateTime, Month},
     timeout::Timeout,

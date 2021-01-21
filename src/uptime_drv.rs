@@ -5,11 +5,12 @@ use core::{
 };
 use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
-use crate::{Tick, TimeSpan, Uptime, UptimeTimer};
+use crate::{Tick, TimeSpan, Uptime, UptimeCounter, UptimeOverflow};
 
-pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<T, A>, A> {
-    clock: PhantomData<T>,
-    timer: Timer,
+pub struct UptimeDrv<T: Tick, Counter: UptimeCounter<T, A>, Overflow: UptimeOverflow<A>, A: Send + Sync> {
+    tick: PhantomData<T>,
+    counter: Counter,
+    overflow: Overflow,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
     get_overflows_level: AtomicUsize,
     /// The number of timer overflow interrupts that have occured.
@@ -20,19 +21,19 @@ pub struct UptimeDrv<T: Tick, Timer: UptimeTimer<T, A>, A> {
     adapter: PhantomData<A>,
 }
 
-unsafe impl<T: Tick, Timer: UptimeTimer<T, A>, A> Sync for UptimeDrv<T, Timer, A> {}
-
-impl<T, Timer, A> UptimeDrv<T, Timer, A>
+impl<T, Counter, Overflow, A> UptimeDrv<T, Counter, Overflow, A>
 where
-    T: Tick + Send + 'static,
-    Timer: UptimeTimer<T, A> + Send + 'static,
-    A: Send + 'static,
+    T: Tick + 'static,
+    Counter: UptimeCounter<T, A> + 'static,
+    Overflow: UptimeOverflow<A> + 'static,
+    A: Send + Sync + 'static,
 {
     /// Create a new Uptime driver.
-    pub fn new<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Arc<impl Uptime<T>> {
+    pub fn new<TimerInt: ThrToken>(counter: Counter, overflow: Overflow, timer_int: TimerInt, _tick: T) -> Arc<impl Uptime<T>> {
         let uptime = Arc::new(Self {
-            clock: PhantomData,
-            timer,
+            tick: PhantomData,
+            counter,
+            overflow,
             get_overflows_level: AtomicUsize::new(0),
             overflows: AtomicU32::new(0),
             overflows_next: AtomicU32::new(1),
@@ -45,7 +46,7 @@ where
             match uptime_weak.upgrade() {
                 Some(uptime) => {
                     // now() must be called at least once per timer period so we register it for the overflow interrupt.
-                    if Timer::is_pending_overflow(&uptime.timer) {
+                    if uptime.overflow.is_pending_overflow() {
                         uptime.now();
                     }
                     fib::Yielded(())
@@ -53,6 +54,7 @@ where
                 None => fib::Complete(()),
             }
         });
+        uptime.overflow.overflow_int_enable();
 
         uptime
     }
@@ -61,12 +63,12 @@ where
         // Increment the thread-recursion count, and get "our" level
         let level = self.get_overflows_level.fetch_add(1, Ordering::Acquire);
 
-        let overflows = if self.timer.is_pending_overflow() {
+        let overflows = if self.overflow.is_pending_overflow() {
             // Get the `overflows_next` value to be assigned to `overflows`
             let overflows_next = self.overflows_next.load(Ordering::Relaxed);
             self.overflows.store(overflows_next, Ordering::Relaxed);
 
-            self.timer.clear_pending_overflow();
+            self.overflow.clear_pending_overflow();
 
             self.overflows_next_pending.store(true, Ordering::Release);
 
@@ -94,14 +96,15 @@ where
     }
 }
 
-impl<T, Timer, A> Uptime<T> for UptimeDrv<T, Timer, A>
+impl<T, Counter, Overflow, A> Uptime<T> for UptimeDrv<T, Counter, Overflow, A>
 where
-    T: Tick + Send + 'static,
-    Timer: UptimeTimer<T, A> + Send + 'static,
-    A: Send + 'static,
+    T: Tick + 'static,
+    Counter: UptimeCounter<T, A> + 'static,
+    Overflow: UptimeOverflow<A> + 'static,
+    A: Send + Sync + 'static,
 {
     fn counter(&self) -> u32 {
-        self.timer.counter()
+        self.counter.value()
     }
 
     fn now(&self) -> TimeSpan<T> {
@@ -110,12 +113,12 @@ where
         // * The underlying timer runs underneath and may wrap during the invocation
 
         let now = loop {
-            let cnt1 = self.timer.counter();
+            let cnt1 = self.counter.value();
             let overflows = self.get_overflows();
-            let cnt2 = self.timer.counter();
+            let cnt2 = self.counter.value();
             if cnt1 <= cnt2 {
                 // There was no timer wrap while `overflows` was obtained.
-                break overflows as u64 * Timer::PERIOD + cnt2 as u64;
+                break overflows as u64 * Counter::PERIOD + cnt2 as u64;
             } else {
                 // The underlying timer wrapped, retry
             }

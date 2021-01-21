@@ -1,8 +1,8 @@
 #[cfg(feature = "systick")]
 pub mod systick;
 
-#[cfg(feature = "stm32")]
-pub mod stm32;
+#[cfg(feature = "stm32f4")]
+pub mod stm32f4;
 
 #[cfg(feature = "systick-experimental")]
 mod systick_experimental;

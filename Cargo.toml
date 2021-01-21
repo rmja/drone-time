@@ -20,7 +20,10 @@ maintenance = { status = "actively-developed" }
 default = []
 systick = ["drone-cortexm"]
 systick-experimental = ["drone-cortexm"]
-stm32 = ["drone-stm32-map"]
+stm32f4 = [
+    "drone-stm32-map",
+    "drone-stm32f4-hal",
+]
 std = [
     "drone-core/std",
     "drone-cortexm/std",
@@ -30,6 +33,7 @@ std = [
 drone-core = { version = "0.14.0", path = "../drone-core" }
 drone-cortexm = { version = "0.14.0", path = "../drone-cortexm", optional = true }
 drone-stm32-map = { version = "0.14.0", features = ["tim"], path = "../drone-stm32-map", optional = true }
+drone-stm32f4-hal = { version = "0.1.0", features = ["tim"], path = "../drone-stm32f4-hal", optional = true }
 futures = { version = "0.3.0", default-features = false }
 async-trait = "0.1"
 atomicbox = { git="https://github.com/rmja/atomicbox" }

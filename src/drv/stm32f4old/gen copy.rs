@@ -12,14 +12,16 @@ use super::gen_ch::TimCh;
 
 pub struct GeneralTimDrv<
     Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms,
-    Int: IntToken,
-    Ch: TimCh<Tim>,
-    T: Tick,
+    UpTim: UptimeTimer<T, Self> + 'static,
+    AlCnt: AlarmCounter<T, Self> + 'static,
+    AlTim: AlarmTimer<T, Self> + 'static,
+    T: Tick + 'static,
 > {
     tim: Arc<GeneralTimDiverged<Tim>>,
-    pub uptime_timer: UptimeTimerDrv<Tim, T>,
-    pub alarm_counter: AlarmCounterDrv<Tim, T>,
-    pub alarm_timer: AlarmTimerDrv<Tim, Int, Ch, T>,
+    pub uptime_timer: UpTim,
+    pub alarm_counter: AlCnt,
+    pub alarm_timer: AlTim,
+    tick: PhantomData<T>,
 }
 
 pub struct UptimeTimerDrv<Tim: GeneralTimMap, T: Tick>(Arc<GeneralTimDiverged<Tim>>, PhantomData<T>);
@@ -45,9 +47,9 @@ pub struct GeneralTimDiverged<Tim: GeneralTimMap> {
 impl<
         Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms,
         Int: IntToken,
-        Ch: TimCh<Tim> + Send + 'static,
+        Ch: TimCh<Tim> + Send,
         T: Tick + 'static,
-    > GeneralTimDrv<Tim, Int, Ch, T>
+    > GeneralTimDrv<Tim, UptimeTimerDrv<Tim, T>, AlarmCounterDrv<Tim, T>, AlarmTimerDrv<Tim, Int, Ch, T>, T>
 {
     pub(crate) fn new(tim: GeneralTimPeriph<Tim>, tim_int: Int, _tick: T) -> Self {
         let tim = Arc::new(GeneralTimDiverged {
@@ -68,6 +70,7 @@ impl<
                 ch: PhantomData,
                 tick: PhantomData,
             },
+            tick: PhantomData,
         }
     }
 

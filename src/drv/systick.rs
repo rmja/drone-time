@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{Tick, UptimeTimer};
-use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
+use crate::{Tick, UptimeCounter, UptimeOverflow};
+use drone_cortexm::{map::periph::sys_tick::{SysTickPeriph}, reg::prelude::*};
 
 pub struct SysTickDrv(SysTickPeriph, AtomicBool);
 
@@ -14,21 +14,26 @@ impl SysTickDrv {
         // Enable timer
         self.0.stk_load.store(|r| r.write_reload(0xFFFFFF));
 
-        self.0.stk_ctrl.store(|r| {
-            r.set_tickint() // Counting down to 0 triggers the SysTick interrupt
-                .set_enable() // Start the counter in a multi-shot way
-        });
+        // Start the counter in a multi-shot way
+        self.0.stk_ctrl.store(|r| r.set_enable());
     }
 }
 
 unsafe impl Sync for SysTickDrv {}
 
-impl<T: Tick> UptimeTimer<T, SysTickDrv> for SysTickDrv {
+impl<T: Tick> UptimeCounter<T, SysTickDrv> for SysTickDrv {
     const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
 
-    fn counter(&self) -> u32 {
+    fn value(&self) -> u32 {
         // SysTick counts down, but the returned counter value must count up.
         0xFFFFFF - self.0.stk_val.load_bits() as u32
+    }
+}
+
+impl UptimeOverflow<SysTickDrv> for SysTickDrv {
+    fn overflow_int_enable(&self) {
+        // Counting down to 0 triggers the SysTick interrupt
+        self.0.stk_ctrl.modify(|r| r.set_tickint());
     }
 
     fn is_pending_overflow(&self) -> bool {
