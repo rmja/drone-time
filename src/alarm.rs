@@ -63,7 +63,7 @@ impl Future for SubscriptionGuard {
         let running = self.running.clone();
         if let Some(mut future) = running.take(Ordering::AcqRel) {
             if future.poll_unpin(cx).is_pending() {
-                // The timer is currently running - there is no chance that we could have completed.
+                // The timer is currently running.
                 // Set the future back if not assigned to some earlier timeout.
                 running.try_store(future, Ordering::Release);
             }
@@ -76,13 +76,17 @@ impl Future for SubscriptionGuard {
         shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
-        let old = shared.value.swap(SubscriptionState::WAKEABLE, Ordering::AcqRel);
+        let old = shared
+            .value
+            .swap(SubscriptionState::WAKEABLE, Ordering::AcqRel);
         assert!(old != SubscriptionState::DROPPED);
         if old == SubscriptionState::COMPLETED {
             // Timeout has already occured.
 
             // Set the state back to COMPLETED.
-            shared.value.store(SubscriptionState::COMPLETED, Ordering::Release);
+            shared
+                .value
+                .store(SubscriptionState::COMPLETED, Ordering::Release);
 
             // Remove the waker that we just assigned - it turns out that it was not needed as we are about to return `Ready`.
             shared.waker.take(Ordering::AcqRel);
@@ -96,7 +100,9 @@ impl Future for SubscriptionGuard {
 
 impl Drop for SubscriptionGuard {
     fn drop(&mut self) {
-        self.state.value.store(SubscriptionState::DROPPED, Ordering::Release);
+        self.state
+            .value
+            .store(SubscriptionState::DROPPED, Ordering::Release);
     }
 }
 
@@ -116,7 +122,7 @@ impl<
             timer: Arc::new(RefCell::new(timer)),
             running: Arc::new(AtomicOptionBox::new(None)),
             subscriptions: Arc::new(Mutex::new(VecDeque::new())),
-            adapter: PhantomData
+            adapter: PhantomData,
         }
     }
 
@@ -154,13 +160,22 @@ impl<
         if index == 0 {
             // It turns out that this subscription is the next in line.
 
-            let future = Self::create_future(self.timer.clone(), self.running.clone(), self.subscriptions.clone(), base, duration);
+            let future = Self::create_future(
+                self.timer.clone(),
+                self.running.clone(),
+                self.subscriptions.clone(),
+                base,
+                duration,
+            );
 
             let running = self.running.clone();
             running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
         }
 
-        SubscriptionGuard { running: self.running.clone(), state: sub_state }
+        SubscriptionGuard {
+            running: self.running.clone(),
+            state: sub_state,
+        }
     }
 
     async fn create_future(
@@ -186,12 +201,17 @@ impl<
 
                     if s.remaining.0 == 0 {
                         // Wake the future for the subscription.
-                        let old = s.state.value.swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
+                        let old = s
+                            .state
+                            .value
+                            .swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
                         if old == SubscriptionState::WAKEABLE {
                             let waker = s.state.waker.take(Ordering::AcqRel).unwrap();
                             waker.wake();
                         } else if old == SubscriptionState::DROPPED {
-                            s.state.value.store(SubscriptionState::DROPPED, Ordering::Release);
+                            s.state
+                                .value
+                                .store(SubscriptionState::DROPPED, Ordering::Release);
                         }
                     }
                 }
@@ -205,14 +225,21 @@ impl<
                     let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
                     let duration = next.remaining;
 
-                    let future = Self::create_future(timer, running.clone(), subscriptions.clone(), base, duration);
+                    let future = Self::create_future(
+                        timer,
+                        running.clone(),
+                        subscriptions.clone(),
+                        base,
+                        duration,
+                    );
                     running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
                 } else {
                     running.take(Ordering::AcqRel);
                 }
 
                 future::ready(())
-            }).await;
+            })
+            .await;
     }
 }
 
@@ -275,6 +302,6 @@ pub mod tests {
         future::join3(t1, t2, t3).await;
 
         // TODO: Find a way for the fake to actually schedule in correct order.
-        assert_eq!(vec![1,2,3], fires.into_inner());
+        assert_eq!(vec![1, 2, 3], fires.into_inner());
     }
 }

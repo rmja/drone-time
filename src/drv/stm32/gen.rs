@@ -6,6 +6,7 @@ use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::tim::general::{
     traits::*, GeneralTimMap, GeneralTimPeriph, TimCr1Cms, TimCr1Dir,
 };
+use futures::future;
 
 use super::gen_ch::TimCh;
 
@@ -162,12 +163,32 @@ impl<
             } else {
                 fib::Yielded(())
             }
-        })));
+        }));
 
-        Ch::set_compare(tim_ch_ccr, u16::try_from(compare).unwrap());
-        Ch::enable_interrupt(self.tim.tim_dier);
+        let compare = u16::try_from(compare).unwrap();
+        Ch::set_compare(&self.tim_ccr, compare);
 
-        AlarmTimerNext::new(self, future)
+        let already_passed = if soon {
+            // Sample counter after interrupt is setup.
+            let counter = self.tim_cnt.cnt().read_bits() as u16;
+
+            // Let's see if counter is later than compare in which case the time has already elapsed
+            counter.wrapping_sub(compare) > 0x8000
+        } else {
+            false
+        };
+
+        if already_passed {
+            // The counter has already passed the comfigured compare value - skip interrupt
+            drop(timeout_future);
+            Ch::clear_pending(tim_sr);
+
+            AlarmTimerNext::new(self, Box::pin(future::ready(())))
+        } else {
+            Ch::enable_interrupt(self.tim_dier);
+
+            AlarmTimerNext::new(self, Box::pin(timeout_future))
+        }
     }
 }
 
