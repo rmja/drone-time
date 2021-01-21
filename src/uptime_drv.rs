@@ -28,8 +28,8 @@ where
     Timer: UptimeTimer<T, A> + Send + 'static,
     A: Send + 'static,
 {
-    /// Start the uptime counter.
-    pub fn start<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Arc<impl Uptime<T>> {
+    /// Create a new Uptime driver.
+    pub fn new<TimerInt: ThrToken>(timer: Timer, timer_int: TimerInt) -> Arc<impl Uptime<T>> {
         let uptime = Arc::new(Self {
             clock: PhantomData,
             timer,
@@ -51,9 +51,6 @@ where
                 None => fib::Complete(()),
             }
         });
-
-        // Start the underlying timer.
-        uptime.timer.start();
 
         uptime
     }

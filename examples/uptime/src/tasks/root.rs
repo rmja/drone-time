@@ -4,10 +4,7 @@ use crate::{adapters::*, consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, reg::prelude::*, swo, thr::prelude::*};
 use drone_stm32_map::periph::tim::periph_tim2;
-use drone_stm32f4_hal::{
-    rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup},
-    tim::{config::*, prelude::*, GeneralTimCfg},
-};
+use drone_stm32f4_hal::{rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup}, tim::{GeneralTimCfg, GeneralTimSetup, prelude::*}};
 use drone_time::{
     drv::stm32::*, drv::systick::SysTickDrv, Alarm, DateTime, TimeSpan, Uptime, UptimeDrv,
     UptimeTimer, Watch,
@@ -56,19 +53,15 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let setup = GeneralTimSetup::new(
         periph_tim2!(reg),
+        thr.tim_2,
         pclk1,
         TimFreq::Nominal(consts::TIM2_FREQ),
     );
     let tim2 = GeneralTimCfg::with_enabled_clock(setup);
     let tim2 = GeneralTimDrv::new_ch1(tim2.release(), thr.tim_2, Tim2Tick);
-    let (
-        uptime_timer,
-        alarm_counter,
-        alarm_timer
-    ) = tim2.split();
 
-    let uptime = UptimeDrv::start(uptime_timer, thr.tim_2);
-    let mut alarm = Alarm::new(alarm_counter, alarm_timer);
+    let uptime = UptimeDrv::new(tim2.uptime_timer, thr.tim_2);
+    let mut alarm = Alarm::new(tim2.alarm_counter, tim2.alarm_timer);
     let mut watch = Watch::new(&*uptime);
     watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 

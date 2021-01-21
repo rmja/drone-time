@@ -9,14 +9,8 @@ impl SysTickDrv {
     pub fn new(systick: SysTickPeriph) -> Self {
         Self(systick, AtomicBool::new(false))
     }
-}
 
-unsafe impl Sync for SysTickDrv {}
-
-impl<T: Tick> UptimeTimer<T, SysTickDrv> for SysTickDrv {
-    const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
-
-    fn start(&self) {
+    pub fn start(&mut self) {
         // Enable timer
         self.0.stk_load.store(|r| r.write_reload(0xFFFFFF));
 
@@ -25,6 +19,12 @@ impl<T: Tick> UptimeTimer<T, SysTickDrv> for SysTickDrv {
                 .set_enable() // Start the counter in a multi-shot way
         });
     }
+}
+
+unsafe impl Sync for SysTickDrv {}
+
+impl<T: Tick> UptimeTimer<T, SysTickDrv> for SysTickDrv {
+    const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
 
     fn counter(&self) -> u32 {
         // SysTick counts down, but the returned counter value must count up.

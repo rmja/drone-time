@@ -141,6 +141,7 @@ impl<
             state: sub_state.clone(),
         };
 
+        // FIXME: Use .lock() when it becomes available.
         let mut subs = self.subscriptions.try_lock().unwrap();
 
         // Remove all subscriptions that are in the `DROPPED` state.
@@ -173,6 +174,7 @@ impl<
         let timer = timer.clone();
         t.sleep(base, duration)
             .then(move |_| {
+                // FIXME: Use .lock() when it becomes available.
                 let mut subs = subscriptions.try_lock().unwrap();
 
                 // Remove all subscriptions that are in the `DROPPED` state.

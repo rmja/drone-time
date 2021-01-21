@@ -9,9 +9,6 @@ pub trait UptimeTimer<T: Tick, A> where Self: Sync {
     /// The timer period.
     const PERIOD: u64 = Self::MAX as u64 + 1;
 
-    /// Start the timer.
-    fn start(&self);
-
     /// Get the current counter value of the timer.
     fn counter(&self) -> u32;
 

@@ -1,10 +1,9 @@
+use drone_core::reg::marker::RwReg;
 use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::tim::general::{
-    traits::*, GeneralTimMap, GeneralTimPeriph, TimCcr2, TimCcr3, TimCcr4, TimDierCc2Ie,
+    traits::*, GeneralTimMap, TimCcr2, TimCcr3, TimCcr4, TimDierCc2Ie,
     TimDierCc3Ie, TimDierCc4Ie, TimSrCc2If, TimSrCc3If, TimSrCc4If,
 };
-
-use super::gen::GeneralTimDiverged;
 
 pub struct TimCh1;
 
@@ -17,13 +16,12 @@ pub struct TimCh4;
 pub trait TimCh<Tim: GeneralTimMap>
 where
     Self: Sized,
-    Self::STimCcr: Send,
+    Self::CTimCcr: Send,
 {
-    type STimCcr;
+    type CTimCcr: RwReg<Crt> + Copy;
 
-    fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self>;
     /// Set compare register for the channel.
-    fn set_compare(tim_ccr: &Self::STimCcr, value: u16);
+    fn set_compare(tim_ch_ccr: Self::CTimCcr, value: u16);
     /// Enable the channel interrupt.
     fn enable_interrupt(tim_dier: Tim::CTimDier);
     /// Disable the channel interrupt.
@@ -35,21 +33,9 @@ where
 }
 
 impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1 {
-    type STimCcr = Tim::STimCcr1;
+    type CTimCcr = Tim::CTimCcr1;
 
-    fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
-        GeneralTimDiverged {
-            tim_cr1: tim.tim_cr1,
-            tim_dier: tim.tim_dier.into_copy(),
-            tim_sr: tim.tim_sr.into_copy(),
-            tim_arr: tim.tim_arr,
-            tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt.into_copy(),
-            tim_ccr: tim.tim_ccr1,
-        }
-    }
-
-    fn set_compare(tim_ccr: &Self::STimCcr, value: u16) {
+    fn set_compare(tim_ccr: Self::CTimCcr, value: u16) {
         tim_ccr.store_bits(value as u32);
     }
 
@@ -74,21 +60,9 @@ impl<Tim: GeneralTimMap> TimCh<Tim> for TimCh1 {
 }
 
 impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for TimCh2 {
-    type STimCcr = Tim::STimCcr2;
+    type CTimCcr = Tim::CTimCcr2;
 
-    fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
-        GeneralTimDiverged {
-            tim_cr1: tim.tim_cr1,
-            tim_dier: tim.tim_dier.into_copy(),
-            tim_sr: tim.tim_sr.into_copy(),
-            tim_arr: tim.tim_arr,
-            tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt.into_copy(),
-            tim_ccr: tim.tim_ccr2,
-        }
-    }
-
-    fn set_compare(tim_ccr: &Self::STimCcr, value: u16) {
+    fn set_compare(tim_ccr: Self::CTimCcr, value: u16) {
         tim_ccr.store_bits(value as u32);
     }
 
@@ -113,21 +87,9 @@ impl<Tim: GeneralTimMap + TimCcr2 + TimDierCc2Ie + TimSrCc2If> TimCh<Tim> for Ti
 }
 
 impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for TimCh3 {
-    type STimCcr = Tim::STimCcr3;
+    type CTimCcr = Tim::CTimCcr3;
 
-    fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
-        GeneralTimDiverged {
-            tim_cr1: tim.tim_cr1,
-            tim_dier: tim.tim_dier.into_copy(),
-            tim_sr: tim.tim_sr.into_copy(),
-            tim_arr: tim.tim_arr,
-            tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt.into_copy(),
-            tim_ccr: tim.tim_ccr3,
-        }
-    }
-
-    fn set_compare(tim_ccr: &Self::STimCcr, value: u16) {
+    fn set_compare(tim_ccr: Self::CTimCcr, value: u16) {
         tim_ccr.store_bits(value as u32);
     }
 
@@ -152,21 +114,9 @@ impl<Tim: GeneralTimMap + TimCcr3 + TimDierCc3Ie + TimSrCc3If> TimCh<Tim> for Ti
 }
 
 impl<Tim: GeneralTimMap + TimCcr4 + TimDierCc4Ie + TimSrCc4If> TimCh<Tim> for TimCh4 {
-    type STimCcr = Tim::STimCcr4;
+    type CTimCcr = Tim::CTimCcr4;
 
-    fn new_diverged(tim: GeneralTimPeriph<Tim>) -> GeneralTimDiverged<Tim, Self> {
-        GeneralTimDiverged {
-            tim_cr1: tim.tim_cr1,
-            tim_dier: tim.tim_dier.into_copy(),
-            tim_sr: tim.tim_sr.into_copy(),
-            tim_arr: tim.tim_arr,
-            tim_egr: tim.tim_egr,
-            tim_cnt: tim.tim_cnt.into_copy(),
-            tim_ccr: tim.tim_ccr4,
-        }
-    }
-
-    fn set_compare(tim_ccr: &Self::STimCcr, value: u16) {
+    fn set_compare(tim_ccr: Self::CTimCcr, value: u16) {
         tim_ccr.store_bits(value as u32);
     }
 
