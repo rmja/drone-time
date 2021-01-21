@@ -22,7 +22,7 @@ pub struct GeneralTimDrv<
     pub alarm_timer: AlarmTimerDrv<Tim, Int, Ch, T>,
 }
 
-pub struct UptimeTimerDrv<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, T: Tick>(Arc<GeneralTimDiverged<Tim>>, PhantomData<T>);
+pub struct UptimeTimerDrv<Tim: GeneralTimMap, T: Tick>(Arc<GeneralTimDiverged<Tim>>, PhantomData<T>);
 
 pub struct AlarmCounterDrv<Tim: GeneralTimMap, T: Tick>(Arc<GeneralTimDiverged<Tim>>, PhantomData<T>);
 
@@ -95,6 +95,16 @@ impl<
         // Start the counter.
         self.tim.tim_cr1.cen().set_bit();
     }
+
+    pub fn split(
+        self,
+    ) -> (
+        impl UptimeTimer<T, Self>,
+        impl AlarmCounter<T, Self>,
+        impl AlarmTimer<T, Self>,
+    ) {
+        (self.uptime_timer, self.alarm_counter, self.alarm_timer)
+    }
 }
 
 pub trait NewGeneralCh1<Tim: GeneralTimMap, Int: IntToken, T: Tick> {
@@ -113,7 +123,9 @@ pub trait NewGeneralCh4<Tim: GeneralTimMap, Int: IntToken, T: Tick> {
     fn new_ch4(tim: GeneralTimPeriph<Tim>, tim_int: Int, tick: T) -> Self;
 }
 
-impl<Tim: GeneralTimMap + TimCr1Dir + TimCr1Cms, T: Tick + Sync, A> UptimeTimer<T, A>
+unsafe impl<Tim: GeneralTimMap, T: Tick> Sync for UptimeTimerDrv<Tim, T> {}
+
+impl<Tim: GeneralTimMap, T: Tick + Sync, A> UptimeTimer<T, A>
     for UptimeTimerDrv<Tim, T>
 {
     const MAX: u32 = 0xFFFF;
@@ -151,11 +163,11 @@ impl<
     type Stop = Self;
     const MAX: u32 = 0xFFFF;
 
-    fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+    fn next(&mut self, compare: u32, soon: bool) -> AlarmTimerNext<'_, Self::Stop> {
         let tim_sr = self.tim.tim_sr;
         let tim_dier = self.tim.tim_dier;
         let tim_ch_ccr = unsafe { Ch::CTimCcr::take() };
-        let future = Box::pin(self.tim_int.add_future(fib::new_fn(move || {
+        let timeout_future = Box::pin(self.tim_int.add_future(fib::new_fn(move || {
             if Ch::is_pending(tim_sr) {
                 Ch::clear_pending(tim_sr);
                 Ch::disable_interrupt(tim_dier);
@@ -163,14 +175,14 @@ impl<
             } else {
                 fib::Yielded(())
             }
-        }));
+        })));
 
         let compare = u16::try_from(compare).unwrap();
-        Ch::set_compare(&self.tim_ccr, compare);
+        Ch::set_compare(tim_ch_ccr, compare);
 
         let already_passed = if soon {
             // Sample counter after interrupt is setup.
-            let counter = self.tim_cnt.cnt().read_bits() as u16;
+            let counter = self.tim.tim_cnt.cnt().read_bits() as u16;
 
             // Let's see if counter is later than compare in which case the time has already elapsed
             counter.wrapping_sub(compare) > 0x8000
@@ -185,7 +197,7 @@ impl<
 
             AlarmTimerNext::new(self, Box::pin(future::ready(())))
         } else {
-            Ch::enable_interrupt(self.tim_dier);
+            Ch::enable_interrupt(tim_dier);
 
             AlarmTimerNext::new(self, Box::pin(timeout_future))
         }

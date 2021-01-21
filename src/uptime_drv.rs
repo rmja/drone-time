@@ -45,7 +45,9 @@ where
             match uptime_weak.upgrade() {
                 Some(uptime) => {
                     // now() must be called at least once per timer period so we register it for the overflow interrupt.
-                    uptime.now();
+                    if Timer::is_pending_overflow(&uptime.timer) {
+                        uptime.now();
+                    }
                     fib::Yielded(())
                 }
                 None => fib::Complete(()),
