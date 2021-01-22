@@ -10,7 +10,7 @@ extern crate alloc;
 mod adapters;
 mod alarm;
 mod datetime;
-pub mod drv;
+pub mod drivers;
 mod timeout;
 mod timespan;
 mod uptime;
@@ -18,10 +18,10 @@ mod uptime_drv;
 mod watch;
 
 pub use self::{
-    adapters::alarm::{AlarmCounter, AlarmTimer},
+    adapters::alarm::{AlarmCounter, AlarmTimer, AlarmTimerMode},
     adapters::tick::Tick,
     adapters::uptime::{UptimeCounter, UptimeOverflow},
-    alarm::Alarm,
+    alarm::{Alarm, AlarmDrv},
     datetime::{DateTime, Month},
     timeout::Timeout,
     timespan::TimeSpan,

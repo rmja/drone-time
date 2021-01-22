@@ -9,13 +9,13 @@ use crate::{Tick, TimeSpan, Uptime, UptimeCounter, UptimeOverflow};
 
 pub struct UptimeDrv<
     T: Tick,
-    Counter: UptimeCounter<T, A>,
-    Overflow: UptimeOverflow<A>,
+    Cnt: UptimeCounter<T, A>,
+    Ovf: UptimeOverflow<A>,
     A: Send + Sync,
 > {
     tick: PhantomData<T>,
-    counter: Counter,
-    overflow: Overflow,
+    counter: Cnt,
+    overflow: Ovf,
     /// The number of threads simultaneously calling now() and seeing the "pending overflow" flag.
     get_overflows_level: AtomicUsize,
     /// The number of timer overflow interrupts that have occured.
@@ -26,17 +26,17 @@ pub struct UptimeDrv<
     adapter: PhantomData<A>,
 }
 
-impl<T, Counter, Overflow, A> UptimeDrv<T, Counter, Overflow, A>
+impl<T, Cnt, Ovf, A> UptimeDrv<T, Cnt, Ovf, A>
 where
     T: Tick + 'static,
-    Counter: UptimeCounter<T, A> + 'static,
-    Overflow: UptimeOverflow<A> + 'static,
+    Cnt: UptimeCounter<T, A> + 'static,
+    Ovf: UptimeOverflow<A> + 'static,
     A: Send + Sync + 'static,
 {
     /// Create a new Uptime driver.
     pub fn new<TimerInt: ThrToken>(
-        counter: Counter,
-        overflow: Overflow,
+        counter: Cnt,
+        overflow: Ovf,
         timer_int: TimerInt,
         _tick: T,
     ) -> Arc<impl Uptime<T>> {
@@ -106,11 +106,11 @@ where
     }
 }
 
-impl<T, Counter, Overflow, A> Uptime<T> for UptimeDrv<T, Counter, Overflow, A>
+impl<T, Cnt, Ovf, A> Uptime<T> for UptimeDrv<T, Cnt, Ovf, A>
 where
     T: Tick + 'static,
-    Counter: UptimeCounter<T, A> + 'static,
-    Overflow: UptimeOverflow<A> + 'static,
+    Cnt: UptimeCounter<T, A> + 'static,
+    Ovf: UptimeOverflow<A> + 'static,
     A: Send + Sync + 'static,
 {
     fn counter(&self) -> u32 {
@@ -128,7 +128,7 @@ where
             let cnt2 = self.counter.value();
             if cnt1 <= cnt2 {
                 // There was no timer wrap while `overflows` was obtained.
-                break overflows as u64 * Counter::PERIOD + cnt2 as u64;
+                break overflows as u64 * Ovf::PERIOD + cnt2 as u64;
             } else {
                 // The underlying timer wrapped, retry
             }

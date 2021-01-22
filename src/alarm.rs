@@ -13,15 +13,26 @@ use atomicbox::AtomicOptionBox;
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
+pub trait Alarm<T: Tick> {
+    /// Get the current counter value of the underlying hardware timer.
+    fn counter(&self) -> u32;
+    
+    /// Get a future that completes after a delay of length `duration`.
+    fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard;
+    
+    /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
+    fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard;
+}
+
 /// An alarm is backed by a single hardware timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
-pub struct Alarm<
-    Counter: AlarmCounter<T, A> + 'static,
-    Timer: AlarmTimer<T, A>,
+pub struct AlarmDrv<
+    Cnt: AlarmCounter<T, A> + 'static,
+    Tim: AlarmTimer<T, A>,
     T: Tick + 'static,
     A: 'static,
 > {
-    counter: Counter,
-    timer: Arc<RefCell<Timer>>,
+    counter: Cnt,
+    timer: Arc<RefCell<Tim>>,
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
     subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
     adapter: PhantomData<A>,
@@ -107,16 +118,16 @@ impl Drop for SubscriptionGuard {
 }
 
 impl<
-        Counter: AlarmCounter<T, A> + 'static,
-        Timer: AlarmTimer<T, A> + 'static,
+        Cnt: AlarmCounter<T, A> + 'static,
+        Tim: AlarmTimer<T, A> + 'static,
         T: Tick + 'static,
         A: Send + 'static,
-    > Alarm<Counter, Timer, T, A>
+    > AlarmDrv<Cnt, Tim, T, A>
 {
-    pub const MAX: u32 = Timer::MAX;
+    pub const MAX: u32 = Tim::MAX;
 
-    /// Create a new `Alarm` backed by a hardware timer.
-    pub fn new(counter: Counter, timer: Timer, _tick: T) -> Self {
+    /// Create a new `AlarmDrv` backed by a hardware timer.
+    pub fn new(counter: Cnt, timer: Tim, _tick: T) -> Self {
         Self {
             counter,
             timer: Arc::new(RefCell::new(timer)),
@@ -126,60 +137,8 @@ impl<
         }
     }
 
-    /// Get the current counter value of the underlying hardware timer.
-    pub fn counter(&self) -> u32 {
-        self.counter.value()
-    }
-
-    /// Get a future that completes after a delay of length `duration`.
-    pub fn sleep(&mut self, duration: TimeSpan<T>) -> impl Future<Output = ()> {
-        self.sleep_from(self.counter(), duration)
-    }
-
-    /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
-    pub fn sleep_from(&mut self, base: u32, duration: TimeSpan<T>) -> impl Future<Output = ()> {
-        let sub_state = Arc::new(SubscriptionState {
-            value: AtomicUsize::new(SubscriptionState::ADDED),
-            waker: AtomicOptionBox::new(None),
-        });
-        let sub = Subscription {
-            remaining: duration,
-            state: sub_state.clone(),
-        };
-
-        // FIXME: Use .lock() when it becomes available.
-        let mut subs = self.subscriptions.try_lock().unwrap();
-
-        // Remove all subscriptions that are in the `DROPPED` state.
-        subs.remove_dropped();
-
-        // Find the position where the new subscription should be added and insert.
-        let index = subs.get_insert_index(duration);
-        subs.insert(index, sub);
-
-        if index == 0 {
-            // It turns out that this subscription is the next in line.
-
-            let future = Self::create_future(
-                self.timer.clone(),
-                self.running.clone(),
-                self.subscriptions.clone(),
-                base,
-                duration,
-            );
-
-            let running = self.running.clone();
-            running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
-        }
-
-        SubscriptionGuard {
-            running: self.running.clone(),
-            state: sub_state,
-        }
-    }
-
     async fn create_future(
-        timer: Arc<RefCell<Timer>>,
+        timer: Arc<RefCell<Tim>>,
         running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
         subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
         base: u32,
@@ -222,7 +181,7 @@ impl<
                 if let Some(next) = subs.front() {
                     // Create a future for the next subscription in line.
 
-                    let base = Timer::counter_add(base, (duration.0 as u64 % Timer::PERIOD) as u32);
+                    let base = Tim::counter_add(base, (duration.0 as u64 % Tim::PERIOD) as u32);
                     let duration = next.remaining;
 
                     let future = Self::create_future(
@@ -240,6 +199,65 @@ impl<
                 future::ready(())
             })
             .await;
+    }
+}
+
+impl<
+    Cnt: AlarmCounter<T, A> + 'static,
+    Tim: AlarmTimer<T, A> + 'static,
+    T: Tick + 'static,
+    A: Send + 'static,
+> Alarm<T> for AlarmDrv<Cnt, Tim, T, A> {
+    /// Get the current counter value of the underlying hardware timer.
+    fn counter(&self) -> u32 {
+        self.counter.value()
+    }
+
+    /// Get a future that completes after a delay of length `duration`.
+    fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard {
+        self.sleep_from(self.counter(), duration)
+    }
+
+    /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
+    fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard {
+        let sub_state = Arc::new(SubscriptionState {
+            value: AtomicUsize::new(SubscriptionState::ADDED),
+            waker: AtomicOptionBox::new(None),
+        });
+        let sub = Subscription {
+            remaining: duration,
+            state: sub_state.clone(),
+        };
+
+        // FIXME: Use .lock() when it becomes available.
+        let mut subs = self.subscriptions.try_lock().unwrap();
+
+        // Remove all subscriptions that are in the `DROPPED` state.
+        subs.remove_dropped();
+
+        // Find the position where the new subscription should be added and insert.
+        let index = subs.get_insert_index(duration);
+        subs.insert(index, sub);
+
+        if index == 0 {
+            // It turns out that this subscription is the next in line.
+
+            let future = Self::create_future(
+                self.timer.clone(),
+                self.running.clone(),
+                self.subscriptions.clone(),
+                base,
+                duration,
+            );
+
+            let running = self.running.clone();
+            running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
+        }
+
+        SubscriptionGuard {
+            running: self.running.clone(),
+            state: sub_state,
+        }
     }
 }
 
@@ -283,7 +301,7 @@ pub mod tests {
             running: false,
             compares: Vec::new(),
         };
-        let mut alarm = Alarm::new(counter, timer);
+        let mut alarm = AlarmDrv::new(counter, timer);
 
         let fires = Mutex::new(Vec::new());
         let t1 = alarm.sleep(TimeSpan::from_ticks(2)).then(|_| {

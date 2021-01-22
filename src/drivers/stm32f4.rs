@@ -1,23 +1,23 @@
-use crate::{AlarmCounter, AlarmTimer, Tick, UptimeCounter, UptimeOverflow};
+use crate::{AlarmTimer, Tick, Counter, UptimeOverflow};
 use async_trait::async_trait;
-use drone_cortexm::thr::IntToken;
 use drone_stm32_map::periph::tim::general::GeneralTimMap;
 use drone_stm32f4_hal::tim::{
+    IntToken,
     DirCountUp, GeneralTimCh, GeneralTimChDrv, GeneralTimCntDrv, GeneralTimOvfDrv,
     OutputCompareMode, TimerCompareCh, TimerCounter, TimerOverflow,
 };
 
 pub struct Adapter;
 
-impl<Tim: GeneralTimMap, T: Tick> UptimeCounter<T, Adapter> for GeneralTimCntDrv<Tim, DirCountUp> {
-    const MAX: u32 = 0xFFFF;
-
+impl<Tim: GeneralTimMap, T: Tick> Counter<T, Adapter> for GeneralTimCntDrv<Tim, DirCountUp> {
     fn value(&self) -> u32 {
         TimerCounter::value(self)
     }
 }
 
 impl<Tim: GeneralTimMap, Int: IntToken> UptimeOverflow<Adapter> for GeneralTimOvfDrv<Tim, Int> {
+    const MAX: u32 = 0xFFFF;
+
     fn overflow_int_enable(&self) {
         TimerOverflow::int_enable(self);
     }
@@ -28,12 +28,6 @@ impl<Tim: GeneralTimMap, Int: IntToken> UptimeOverflow<Adapter> for GeneralTimOv
 
     fn clear_pending_overflow(&self) {
         TimerOverflow::clear_pending(self);
-    }
-}
-
-impl<Tim: GeneralTimMap, T: Tick> AlarmCounter<T, Adapter> for GeneralTimCntDrv<Tim, DirCountUp> {
-    fn value(&self) -> u32 {
-        TimerCounter::value(self)
     }
 }
 

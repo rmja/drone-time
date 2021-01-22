@@ -8,7 +8,7 @@ mod stm32f4;
 mod systick_experimental;
 
 #[cfg(feature = "systick")]
-pub use self::systick::SysTickDrv;
+pub use self::systick::*;
 
 #[cfg(feature = "systick-experimental")]
 pub use self::systick_experimental::SysTickDrv;

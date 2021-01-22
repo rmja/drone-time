@@ -4,44 +4,47 @@ use crate::{Tick, UptimeCounter, UptimeOverflow};
 use alloc::sync::Arc;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
-/// A cortex SysTick driver.
-pub struct SysTickDrv {
-    /// The timer counter.
-    pub counter: SysTickCntDrv,
-    /// The timer overflow control.
-    pub overflow: SysTickOvfDrv,
-}
-pub struct SysTickCntDrv(Arc<SysTickPeriph>);
-pub struct SysTickOvfDrv(Arc<SysTickPeriph>, AtomicBool);
+use super::{Adapter, diverged::SysTickDiverged};
 
-impl SysTickDrv {
+/// A cortex SysTick uptime driver.
+pub struct SysTickUptimeDrv {
+    /// The timer counter.
+    pub counter: SysTickCounterDrv,
+    /// The overflow control.
+    pub overflow: SysTickOverflowDrv,
+}
+pub struct SysTickCounterDrv(Arc<SysTickDiverged>);
+pub struct SysTickOverflowDrv(Arc<SysTickDiverged>, AtomicBool);
+
+impl SysTickUptimeDrv {
     pub fn new(systick: SysTickPeriph) -> Self {
         // Configure reload value.
         systick.stk_load.store(|r| r.write_reload(0xFFFFFF));
 
-        let systick = Arc::new(systick);
+        let systick = Arc::new(SysTickDiverged::new(systick));
         Self {
-            counter: SysTickCntDrv(systick.clone()),
-            overflow: SysTickOvfDrv(systick, AtomicBool::new(false)),
+            counter: SysTickCounterDrv(systick.clone()),
+            overflow: SysTickOverflowDrv(systick, AtomicBool::new(false)),
         }
     }
 
+    /// Start the counter in a multi-shot way
     pub fn start(&mut self) {
-        // Start the counter in a multi-shot way
         self.counter.0.stk_ctrl.store(|r| r.set_enable());
     }
 }
 
-impl<T: Tick> UptimeCounter<T, SysTickDrv> for SysTickCntDrv {
-    const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
 
+impl<T: Tick> UptimeCounter<T, Adapter> for SysTickCounterDrv {
     fn value(&self) -> u32 {
         // SysTick counts down, but the returned counter value must count up.
         0xFFFFFF - self.0.stk_val.load_bits() as u32
     }
 }
 
-impl UptimeOverflow<SysTickDrv> for SysTickOvfDrv {
+impl UptimeOverflow<Adapter> for SysTickOverflowDrv {
+    const MAX: u32 = 0xFFFFFF; // SysTick is a 24 bit counter.
+
     fn overflow_int_enable(&self) {
         // Counting down to 0 triggers the SysTick interrupt
         self.0.stk_ctrl.modify(|r| r.set_tickint());

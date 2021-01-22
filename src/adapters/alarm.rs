@@ -2,12 +2,20 @@ use crate::{Tick, TimeSpan};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 
-pub trait AlarmCounter<T: Tick, A>
-where
-    Self: Sync,
-{
+/// The alarm timer counter.
+/// The counter must be monotonically increasing.
+pub trait AlarmCounter<T: Tick, A>: Send + Sync {
     /// Get the current counter value of the timer.
     fn value(&self) -> u32;
+}
+
+pub enum AlarmTimerMode {
+    /// The preferred timer mode.
+    /// The timer is always running between between 0 <= counter <= MAX, even when compare value is currently configured.
+    AlwaysRunning,
+    /// The alternate timer mode to be used when the timer is not always running between 0 <= counter <= MAX.
+    /// This mode is less robust when the duration exceeds a period, as jitter is introduced when setting up the next interrupt.
+    OneShotOnly,
 }
 
 #[async_trait]
@@ -19,29 +27,57 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
     const PERIOD: u64 = Self::MAX as u64 + 1;
     const HALF_PERIOD: u32 = (Self::PERIOD / 2) as u32;
 
+    /// Whether the timer can be assumed to be always running.
+    const MODE: AlarmTimerMode = AlarmTimerMode::AlwaysRunning;
+
     /// Returns a future that resolves when the timer counter is equal to `compare`.
     /// Note that compare is not a duration but an absolute timestamp.
     /// The returned future is resolved immediately if `soon` and
     /// the compare value has already passed with at most `PERIOD/2` ticks.
-    async fn next(&mut self, compare: u32, soon: bool);
+    ///
+    /// This function is only ever called if MODE == AlwaysRunning.
+    async fn next(&mut self, _compare: u32, _soon: bool) {
+        panic!("next() must be implemented when MODE == AlwaysRunning");
+    }
+
+    /// Returns a future that resolves when `duration` time is elapsed.
+    ///
+    /// This function is only ever called if MODE == OneShotOnly.
+    async fn delay(&mut self, _duration: u32) {
+        panic!("delay() must be implemented when MODE == OneShotOnly");
+    }
 
     async fn sleep(&mut self, mut base: u32, duration: TimeSpan<T>) {
         let mut remaining = u64::try_from(duration.0).expect("duration must be non negative");
-        let soon = remaining < Self::PERIOD / 2;
+        match Self::MODE {
+            AlarmTimerMode::AlwaysRunning => {
+                let soon = remaining < Self::PERIOD / 2;
 
-        // The maximum delay is half the counters increment.
-        // This ensures that we can hit the actual fire time directly when the last timeout is setup.
-        while remaining >= Self::PERIOD {
-            // We can setup the final time
-            let compare = Self::counter_add(base, Self::HALF_PERIOD);
-            self.next(compare, false).await;
-            base = compare;
-            remaining -= Self::HALF_PERIOD as u64;
-        }
+                // The maximum delay is half the counters increment.
+                // This ensures that we can hit the actual fire time directly when the last timeout is setup.
+                while remaining >= Self::PERIOD {
+                    // We cannot setup the final time
+                    let compare = Self::counter_add(base, Self::HALF_PERIOD);
+                    self.next(compare, false).await;
+                    base = compare;
+                    remaining -= Self::HALF_PERIOD as u64;
+                }
 
-        if remaining > 0 {
-            let compare = Self::counter_add(base, remaining as u32);
-            self.next(compare, soon).await;
+                if remaining > 0 {
+                    let compare = Self::counter_add(base, remaining as u32);
+                    self.next(compare, soon).await;
+                }
+            },
+            AlarmTimerMode::OneShotOnly => {
+                assert_eq!(0, base);
+                while remaining >= Self::MAX as u64 {
+                    self.delay(Self::MAX).await;
+                    remaining -= Self::MAX  as u64;
+                }
+                if remaining > 0 {
+                    self.delay(remaining as u32).await;
+                }
+            }
         }
     }
 
