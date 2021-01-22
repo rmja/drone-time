@@ -1,7 +1,7 @@
 use drone_core::reg::prelude::*;
 use drone_cortexm::map::{
+    periph::sys_tick::SysTickPeriph,
     reg::{scb, stk},
-    periph::sys_tick::SysTickPeriph
 };
 
 #[allow(dead_code)]

@@ -7,12 +7,7 @@ use drone_core::{fib, thr::prelude::*, thr::ThrToken};
 
 use crate::{Tick, TimeSpan, Uptime, UptimeCounter, UptimeOverflow};
 
-pub struct UptimeDrv<
-    T: Tick,
-    Cnt: UptimeCounter<T, A>,
-    Ovf: UptimeOverflow<A>,
-    A: Send + Sync,
-> {
+pub struct UptimeDrv<T: Tick, Cnt: UptimeCounter<T, A>, Ovf: UptimeOverflow<A>, A: Send + Sync> {
     tick: PhantomData<T>,
     counter: Cnt,
     overflow: Ovf,

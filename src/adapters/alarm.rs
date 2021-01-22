@@ -67,12 +67,12 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
                     let compare = Self::counter_add(base, remaining as u32);
                     self.next(compare, soon).await;
                 }
-            },
+            }
             AlarmTimerMode::OneShotOnly => {
                 assert_eq!(0, base);
                 while remaining >= Self::MAX as u64 {
                     self.delay(Self::MAX).await;
-                    remaining -= Self::MAX  as u64;
+                    remaining -= Self::MAX as u64;
                 }
                 if remaining > 0 {
                     self.delay(remaining as u32).await;

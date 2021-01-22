@@ -16,10 +16,10 @@ use futures::prelude::*;
 pub trait Alarm<T: Tick> {
     /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32;
-    
+
     /// Get a future that completes after a delay of length `duration`.
     fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard;
-    
+
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard;
 }
@@ -203,11 +203,12 @@ impl<
 }
 
 impl<
-    Cnt: AlarmCounter<T, A> + 'static,
-    Tim: AlarmTimer<T, A> + 'static,
-    T: Tick + 'static,
-    A: Send + 'static,
-> Alarm<T> for AlarmDrv<Cnt, Tim, T, A> {
+        Cnt: AlarmCounter<T, A> + 'static,
+        Tim: AlarmTimer<T, A> + 'static,
+        T: Tick + 'static,
+        A: Send + 'static,
+    > Alarm<T> for AlarmDrv<Cnt, Tim, T, A>
+{
     /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32 {
         self.counter.value()

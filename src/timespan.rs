@@ -103,7 +103,8 @@ impl<T: Tick> TimeSpan<T> {
     pub const fn from_micros(micros: i64) -> Self {
         let millis = micros / 1000;
         let sub_millis = micros - millis * 1000;
-        let ticks = (millis * Self::TICKS_PER_SEC) / 1000 + (sub_millis * Self::TICKS_PER_SEC) / 1_000_000;
+        let ticks =
+            (millis * Self::TICKS_PER_SEC) / 1000 + (sub_millis * Self::TICKS_PER_SEC) / 1_000_000;
         Self::from_ticks(ticks)
     }
 
@@ -112,7 +113,8 @@ impl<T: Tick> TimeSpan<T> {
     pub const fn from_nanos(nanos: i64) -> Self {
         let micros = nanos / 1000;
         let sub_micros = nanos - micros * 1000;
-        let ticks = (micros * Self::TICKS_PER_SEC) / 1_000_000 + (sub_micros * Self::TICKS_PER_SEC) / 1_000_000_000;
+        let ticks = (micros * Self::TICKS_PER_SEC) / 1_000_000
+            + (sub_micros * Self::TICKS_PER_SEC) / 1_000_000_000;
         Self::from_ticks(ticks)
     }
 

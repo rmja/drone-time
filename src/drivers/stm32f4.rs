@@ -1,12 +1,12 @@
-use crate::{AlarmTimer, Tick, UptimeCounter, AlarmCounter, UptimeOverflow};
+use crate::{AlarmCounter, AlarmTimer, Tick, UptimeCounter, UptimeOverflow};
 use async_trait::async_trait;
 use drone_stm32_map::periph::tim::general::GeneralTimMap;
 use drone_stm32f4_hal::{
-    IntToken,
     tim::{
         DirCountUp, GeneralTimCh, GeneralTimChDrv, GeneralTimCntDrv, GeneralTimOvfDrv,
         OutputCompareMode, TimerCompareCh, TimerCounter, TimerOverflow,
-    }
+    },
+    IntToken,
 };
 
 pub struct Adapter;

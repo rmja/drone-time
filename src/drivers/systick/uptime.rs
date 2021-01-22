@@ -4,7 +4,7 @@ use crate::{Tick, UptimeCounter, UptimeOverflow};
 use alloc::sync::Arc;
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
 
-use super::{Adapter, diverged::SysTickDiverged};
+use super::{diverged::SysTickDiverged, Adapter};
 
 /// A cortex SysTick uptime driver.
 pub struct SysTickUptimeDrv {
@@ -33,7 +33,6 @@ impl SysTickUptimeDrv {
         self.counter.0.stk_ctrl.store(|r| r.set_enable());
     }
 }
-
 
 impl<T: Tick> UptimeCounter<T, Adapter> for SysTickCounterDrv {
     fn value(&self) -> u32 {

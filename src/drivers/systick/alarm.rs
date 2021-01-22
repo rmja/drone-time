@@ -1,9 +1,9 @@
 use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick};
+use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
 use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
-use async_trait::async_trait;
 
-use super::{Adapter, diverged::SysTickDiverged};
+use super::{diverged::SysTickDiverged, Adapter};
 
 /// A cortex SysTick alarm driver.
 pub struct SysTickAlarmDrv<Int: ThrToken> {
@@ -43,8 +43,7 @@ impl<Int: ThrToken, T: Tick + 'static> AlarmTimer<T, Adapter> for SysTickTimerDr
                 stk_ctrl.modify(|r| r.clear_tickint().clear_enable());
 
                 fib::Complete(())
-            }
-            else {
+            } else {
                 fib::Yielded(())
             }
         })));
