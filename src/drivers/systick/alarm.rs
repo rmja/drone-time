@@ -1,7 +1,7 @@
-use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick};
+use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::dwt_burn_cycles};
 use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
-use drone_cortexm::{map::periph::sys_tick::SysTickPeriph, reg::prelude::*};
+use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph}, reg::prelude::*};
 
 use super::{diverged::SysTickDiverged, Adapter};
 
@@ -28,6 +28,10 @@ impl<Int: ThrToken> SysTickAlarmDrv<Int> {
 impl<T: Tick> AlarmCounter<T, Adapter> for SysTickCounterDrv {
     fn value(&self) -> u32 {
         0 // The counter is not running
+    }
+
+    fn burn_cycles(&self, cycles: u32) {
+        dwt_burn_cycles(cycles);
     }
 }
 

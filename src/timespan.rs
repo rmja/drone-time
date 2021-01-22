@@ -105,14 +105,6 @@ impl<T: Tick> TimeSpan<T> {
         Self::from_ticks(sec_ticks / 1000)
     }
 
-    /// Create a new `TimeSpan` from the specified number of _whole_ nanoseconds.
-    pub const fn from_nanos(nanos: i64) -> Self {
-        let micros = nanos / 1000;
-        let sub_micros = nanos - micros * 1000;
-        let sec_ticks = micros * Self::TICKS_PER_SEC + (sub_micros * Self::TICKS_PER_SEC) / 1000;
-        Self::from_ticks(sec_ticks / 1000000)
-    }
-
     /// Create a new `TimeSpan` from the specified number of _whole_ ticks.
     pub const fn from_ticks(ticks: i64) -> Self {
         Self(ticks, PhantomData)
@@ -308,13 +300,5 @@ pub mod tests {
         assert_eq!(1, TimeSpan::<TestTick>::from_micros(31).0);
         assert_eq!(1, TimeSpan::<TestTick>::from_micros(61).0);
         assert_eq!(2, TimeSpan::<TestTick>::from_micros(62).0);
-    }
-
-    #[test]
-    fn from_nanos() {
-        assert_eq!(0, TimeSpan::<TestTick>::from_nanos(30517).0);
-        assert_eq!(1, TimeSpan::<TestTick>::from_nanos(30518).0);
-        assert_eq!(1, TimeSpan::<TestTick>::from_nanos(61035).0);
-        assert_eq!(2, TimeSpan::<TestTick>::from_nanos(61036).0);
     }
 }

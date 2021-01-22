@@ -17,8 +17,24 @@ pub trait Alarm<T: Tick> {
     /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32;
 
+    /// Burn a number of clock cycles.
+    fn burn_cycles(&self, cycles: u32);
+
+    /// Burn a number of nanoseconds.
+    fn burn_nanos(&self, mut nanos: u32) {
+        debug_assert_ne!(0, T::CPU_FREQ, "The Tick::CPU_FREQ must be defined to support cycle by nanoseconds.");
+
+        while nanos > 1000 {
+            self.burn_cycles((nanos * (T::CPU_FREQ / 1000)) / 1000000);
+            nanos -= 1000;
+        }
+        self.burn_cycles((nanos * (T::CPU_FREQ / 1000)) / 1000000);
+    }
+
     /// Get a future that completes after a delay of length `duration`.
-    fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard;
+    fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard {
+        self.sleep_from(self.counter(), duration)
+    }
 
     /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard;
@@ -209,17 +225,14 @@ impl<
         A: Send + 'static,
     > Alarm<T> for AlarmDrv<Cnt, Tim, T, A>
 {
-    /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32 {
         self.counter.value()
     }
 
-    /// Get a future that completes after a delay of length `duration`.
-    fn sleep(&self, duration: TimeSpan<T>) -> SubscriptionGuard {
-        self.sleep_from(self.counter(), duration)
+    fn burn_cycles(&self, cycles: u32) {
+        self.counter.burn_cycles(cycles);
     }
 
-    /// Get a future that completes after a delay of length `duration` relative to the counter value `base`.
     fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard {
         let sub_state = Arc::new(SubscriptionState {
             value: AtomicUsize::new(SubscriptionState::ADDED),

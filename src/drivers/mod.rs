@@ -7,6 +7,9 @@ mod stm32f4;
 #[cfg(feature = "systick-experimental")]
 mod systick_experimental;
 
+#[cfg(any(feature = "systick", feature = "stm32f4"))]
+mod cortexm;
+
 #[cfg(feature = "systick")]
 pub use self::systick::*;
 
