@@ -8,7 +8,7 @@ use drone_stm32f4_hal::{
     rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup},
     tim::{prelude::*, GeneralTimCfg, GeneralTimSetup},
 };
-use drone_time::{drv::SysTickDrv, Alarm, DateTime, TimeSpan, Uptime, UptimeDrv, Watch};
+use drone_time::{Alarm, AlarmDrv, DateTime, TimeSpan, Uptime, UptimeDrv, Watch, drivers::SysTickUptimeDrv};
 use futures::prelude::*;
 
 /// The root task handler.
@@ -45,7 +45,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     println!("Hello, world!");
 
-    // let systick = SysTickDrv::new(periph_sys_tick!(reg));
+    // let systick = SysTickUptimeDrv::new(periph_sys_tick!(reg));
     // let uptime = UptimeDrv::new(
     //     systick.counter,
     //     systick.overflow,
@@ -64,7 +64,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     tim2.start();
 
     let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, Tim2Tick);
-    let mut alarm = Alarm::new(tim2.counter, tim2.ch1, Tim2Tick);
+    let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, Tim2Tick);
     let mut watch = Watch::new(uptime.clone());
     watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 
