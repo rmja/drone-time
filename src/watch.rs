@@ -54,11 +54,12 @@ pub mod tests {
         token::Token,
     };
 
-    use crate::{Month, UptimeDrv, UptimeTimer};
+    use crate::{Month, UptimeCounter, UptimeDrv, UptimeOverflow};
 
     use super::*;
 
-    struct TestTick;
+    struct Adapter;
+
     struct TestAlarm;
 
     #[derive(Clone, Copy)]
@@ -73,17 +74,21 @@ pub mod tests {
         local: TestThreadLocal,
     };
 
+    struct TestTick;
     impl Tick for TestTick {
         const FREQ: u32 = 32768;
     }
 
-    impl UptimeTimer<TestTick, TestTick> for TestAlarm {
+    impl UptimeCounter<TestTick, Adapter> for TestAlarm {
+        fn value(&self) -> u32 {
+            0
+        }
+    }
+
+    impl UptimeOverflow<Adapter> for TestAlarm {
         const MAX: u32 = 0xFFFF;
 
-        fn start(&self) {}
-
-        fn counter(&self) -> u32 {
-            0
+        fn overflow_int_enable(&self) {
         }
 
         fn is_pending_overflow(&self) -> bool {
@@ -131,10 +136,11 @@ pub mod tests {
 
     #[test]
     fn set() {
-        let alarm = TestAlarm;
+        let counter = TestAlarm;
+        let overflow = TestAlarm;
         let thread = TestToken;
-        let uptime = UptimeDrv::start(alarm, thread, TestTick);
-        let mut watch = Watch::new(&*uptime);
+        let uptime = UptimeDrv::new(counter, overflow, thread, TestTick);
+        let mut watch = Watch::new(uptime);
 
         let now = watch.now();
         assert!(now.is_err());

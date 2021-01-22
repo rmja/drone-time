@@ -90,64 +90,47 @@ pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
 
 #[cfg(test)]
 pub mod fakes {
-    use futures::future;
-
     use super::*;
 
-    pub struct FakeDrv;
+    pub struct Adapter;
 
     pub struct FakeAlarmCounter(pub(crate) u32);
 
     pub struct FakeAlarmTimer {
-        pub(crate) running: bool,
         pub(crate) compares: Vec<u32>,
     }
 
-    impl Tick for FakeDrv {
+    pub struct FakeTick;
+    impl Tick for FakeTick {
         const FREQ: u32 = 1;
     }
 
-    impl AlarmCounter<FakeDrv, FakeDrv> for FakeAlarmCounter {
+    impl AlarmCounter<FakeTick, Adapter> for FakeAlarmCounter {
         fn value(&self) -> u32 {
             self.0
         }
     }
 
-    impl AlarmTimer<FakeDrv, FakeDrv> for FakeAlarmTimer {
-        type Stop = Self;
+    #[async_trait]
+    impl AlarmTimer<FakeTick, Adapter> for FakeAlarmTimer {
         const MAX: u32 = 9;
 
-        fn next(&mut self, compare: u32) -> AlarmTimerNext<'_, Self::Stop> {
+        async fn next(&mut self, compare: u32, _soon: bool) {
             assert!(compare <= Self::MAX);
-            assert!(!self.running);
             self.compares.push(compare);
-            self.running = true;
-            let fut = Box::pin(future::ready(()));
-            AlarmTimerNext::new(self, fut)
-        }
-    }
-
-    impl AlarmTimerStop for FakeAlarmTimer {
-        fn stop(&mut self) {
-            assert!(self.running);
-            self.running = false;
         }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use futures::future;
-    use futures_await_test::async_test;
-
-    use crate::adapters::alarm::fakes::FakeAlarmTimer;
-
     use super::*;
+    use crate::adapters::alarm::fakes::FakeAlarmTimer;
+    use futures_await_test::async_test;
 
     #[async_test]
     async fn sleep_less_than_a_period() {
         let mut timer = FakeAlarmTimer {
-            running: false,
             compares: Vec::new(),
         };
 
@@ -159,7 +142,6 @@ pub mod tests {
     #[async_test]
     async fn sleep_a_period() {
         let mut timer = FakeAlarmTimer {
-            running: false,
             compares: Vec::new(),
         };
 
@@ -171,7 +153,6 @@ pub mod tests {
     #[async_test]
     async fn sleep_more_than_a_period() {
         let mut timer = FakeAlarmTimer {
-            running: false,
             compares: Vec::new(),
         };
 
@@ -183,13 +164,10 @@ pub mod tests {
     #[test]
     fn sleep_drop() {
         let mut timer = FakeAlarmTimer {
-            running: false,
             compares: Vec::new(),
         };
 
         let sleep = timer.sleep(4, TimeSpan::from_ticks(123));
         drop(sleep);
-
-        assert!(!timer.running);
     }
 }

@@ -291,7 +291,7 @@ pub mod tests {
     use futures::future;
     use futures_await_test::async_test;
 
-    use crate::adapters::alarm::fakes::{FakeAlarmCounter, FakeAlarmTimer};
+    use crate::adapters::alarm::fakes::{FakeAlarmCounter, FakeAlarmTimer, FakeTick};
 
     use super::*;
 
@@ -299,10 +299,9 @@ pub mod tests {
     async fn whoot() {
         let counter = FakeAlarmCounter(4);
         let timer = FakeAlarmTimer {
-            running: false,
             compares: Vec::new(),
         };
-        let mut alarm = AlarmDrv::new(counter, timer);
+        let alarm = AlarmDrv::new(counter, timer, FakeTick);
 
         let fires = Mutex::new(Vec::new());
         let t1 = alarm.sleep(TimeSpan::from_ticks(2)).then(|_| {
