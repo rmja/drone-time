@@ -1,4 +1,4 @@
-use crate::{AlarmCounter, AlarmTimer, Tick, UptimeCounter, UptimeOverflow, drivers::cortexm::dwt_burn_cycles};
+use crate::{AlarmCounter, AlarmTimer, Tick, UptimeCounter, UptimeOverflow, drivers::cortexm::burn};
 use async_trait::async_trait;
 use drone_stm32_map::periph::tim::general::GeneralTimMap;
 use drone_stm32f4_hal::{
@@ -39,7 +39,7 @@ impl<Tim: GeneralTimMap, T: Tick> AlarmCounter<T, Adapter> for GeneralTimCntDrv<
     }
 
     fn burn_cycles(&self, cycles: u32) {
-        dwt_burn_cycles(cycles);
+        burn(cycles);
     }
 }
 

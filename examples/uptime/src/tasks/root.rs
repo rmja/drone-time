@@ -3,10 +3,14 @@
 use crate::{adapters::*, consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, swo, thr::prelude::*};
-use drone_stm32_map::periph::tim::periph_tim2;
+use drone_stm32_map::periph::{
+    tim::periph_tim2,
+    gpio::{periph_gpio_d_head, periph_gpio_d13},
+};
 use drone_stm32f4_hal::{
     rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup},
     tim::{prelude::*, GeneralTimCfg, GeneralTimSetup},
+    gpio::{GpioHead, prelude::*}
 };
 use drone_time::{Alarm, AlarmDrv, DateTime, TimeSpan, Uptime, UptimeDrv, Watch, drivers::SysTickUptimeDrv};
 use futures::prelude::*;
@@ -45,6 +49,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     println!("Hello, world!");
 
+    let gpio_a = GpioHead::with_enabled_clock(periph_gpio_d_head!(reg));
+    let dbg_pin = gpio_a.pin(periph_gpio_d13!(reg))
+        .into_output()
+        .into_pushpull();
+
     // let systick = SysTickUptimeDrv::new(periph_sys_tick!(reg));
     // let uptime = UptimeDrv::new(
     //     systick.counter,
@@ -65,6 +74,15 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, Tim2Tick);
     let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, Tim2Tick);
+
+    for _i in 0..10 {
+        dbg_pin.set();
+        // 10000 cycles should take around 55ms@180MHz.
+        alarm.burn_cycles(10000);
+        dbg_pin.clear();
+        alarm.burn_cycles(10000);
+    }
+
     let mut watch = Watch::new(uptime.clone());
     watch.set(DateTime::new(2021, 1.into(), 1, 0, 0, 0), uptime.now());
 

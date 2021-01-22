@@ -1,4 +1,4 @@
-use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::dwt_burn_cycles};
+use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::burn};
 use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
 use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph}, reg::prelude::*};
@@ -31,7 +31,7 @@ impl<T: Tick> AlarmCounter<T, Adapter> for SysTickCounterDrv {
     }
 
     fn burn_cycles(&self, cycles: u32) {
-        dwt_burn_cycles(cycles);
+        burn(cycles);
     }
 }
 

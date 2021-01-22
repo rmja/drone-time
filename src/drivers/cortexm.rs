@@ -1,11 +1,13 @@
-use drone_core::{reg::prelude::*, token::Token};
-use drone_cortexm::map::reg::dwt;
+const CYCLES_PER_ITERATION: u32 = 3;
 
-pub(crate) fn dwt_burn_cycles(cycles: u32) {
-    let cyccnt = unsafe { dwt::Cyccnt::<Urt>::take() };
-    let entry = cyccnt.load_bits() as u32;
-    let mut now = cyccnt.load_bits() as u32;
-    while now.wrapping_sub(entry) < cycles {
-        now = cyccnt.load_bits() as u32;
+pub(crate) fn burn(mut cycles: u32) {
+    cycles /= CYCLES_PER_ITERATION;
+    unsafe {
+        asm!(
+            "loop:",
+            "subs {0}, {0}, #1",
+            "bne loop",
+            in(reg) cycles
+        );
     }
 }
