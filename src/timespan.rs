@@ -88,34 +88,29 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ milliseconds.
-    // TODO: Maybe add Rounding
     pub const fn from_millis(millis: i64) -> Self {
         assert!(millis >= Self::MIN_MILLIS && millis <= Self::MAX_MILLIS);
 
         let secs = millis / 1000;
         let sub_secs = millis - secs * 1000;
-        let ticks = secs * Self::TICKS_PER_SEC + (sub_secs * 1000 * Self::TICKS_PER_SEC) / 1000;
+        let ticks = secs * Self::TICKS_PER_SEC + (sub_secs * Self::TICKS_PER_SEC) / 1000;
         Self::from_ticks(ticks)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ microseconds.
-    // TODO: Maybe add Rounding
     pub const fn from_micros(micros: i64) -> Self {
         let millis = micros / 1000;
         let sub_millis = micros - millis * 1000;
-        let ticks =
-            (millis * Self::TICKS_PER_SEC) / 1000 + (sub_millis * Self::TICKS_PER_SEC) / 1_000_000;
-        Self::from_ticks(ticks)
+        let sec_ticks = millis * Self::TICKS_PER_SEC + (sub_millis * Self::TICKS_PER_SEC) / 1000;
+        Self::from_ticks(sec_ticks / 1000)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ nanoseconds.
-    // TODO: Maybe add Rounding
     pub const fn from_nanos(nanos: i64) -> Self {
         let micros = nanos / 1000;
         let sub_micros = nanos - micros * 1000;
-        let ticks = (micros * Self::TICKS_PER_SEC) / 1_000_000
-            + (sub_micros * Self::TICKS_PER_SEC) / 1_000_000_000;
-        Self::from_ticks(ticks)
+        let sec_ticks = micros * Self::TICKS_PER_SEC + (sub_micros * Self::TICKS_PER_SEC) / 1000;
+        Self::from_ticks(sec_ticks / 1000000)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ ticks.
@@ -298,5 +293,28 @@ pub mod tests {
             1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5,
             millis
         );
+    }
+
+    #[test]
+    fn from_millis() {
+        assert_eq!(32, TimeSpan::<TestTick>::from_millis(1).0);
+        assert_eq!(65, TimeSpan::<TestTick>::from_millis(2).0);
+        assert_eq!(98, TimeSpan::<TestTick>::from_millis(3).0);
+    }
+
+    #[test]
+    fn from_micros() {
+        assert_eq!(0, TimeSpan::<TestTick>::from_micros(30).0);
+        assert_eq!(1, TimeSpan::<TestTick>::from_micros(31).0);
+        assert_eq!(1, TimeSpan::<TestTick>::from_micros(61).0);
+        assert_eq!(2, TimeSpan::<TestTick>::from_micros(62).0);
+    }
+
+    #[test]
+    fn from_nanos() {
+        assert_eq!(0, TimeSpan::<TestTick>::from_nanos(30517).0);
+        assert_eq!(1, TimeSpan::<TestTick>::from_nanos(30518).0);
+        assert_eq!(1, TimeSpan::<TestTick>::from_nanos(61035).0);
+        assert_eq!(2, TimeSpan::<TestTick>::from_nanos(61036).0);
     }
 }
