@@ -1,6 +1,6 @@
 use core::{pin::Pin, task::{Context, Poll}};
 
-use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::burn};
+use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::spin};
 use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
 use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph, reg::stk}, reg::prelude::*};
@@ -75,8 +75,9 @@ impl<T: Tick> AlarmCounter<T, Adapter> for SysTickCounterDrv {
         0 // The counter is not running
     }
 
+    #[inline]
     fn burn_cycles(&self, cycles: u32) {
-        burn(cycles);
+        spin(cycles);
     }
 }
 

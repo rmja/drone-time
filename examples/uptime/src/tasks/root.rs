@@ -75,12 +75,21 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, Tim2Tick);
     let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, Tim2Tick);
 
+    assert_eq!(180_000_000, consts::SYSCLK.f());
+    // 1000000 cycles should take 5555us@180MHz, measured in release build to 5.555ms-5.557ms.
     for _i in 0..10 {
         dbg_pin.set();
-        // 10000 cycles should take around 55ms@180MHz.
-        alarm.burn_cycles(10000);
+        alarm.burn_cycles(1000000);
         dbg_pin.clear();
-        alarm.burn_cycles(10000);
+        alarm.burn_cycles(1000000);
+        dbg_pin.set();
+        alarm.burn_cycles(1000000);
+        dbg_pin.clear();
+        alarm.burn_cycles(1000000);
+        dbg_pin.set();
+        alarm.burn_cycles(1000000);
+        dbg_pin.clear();
+        alarm.burn_cycles(1000000);
     }
 
     let mut watch = Watch::new(uptime.clone());

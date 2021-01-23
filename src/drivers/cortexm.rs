@@ -1,13 +1,16 @@
 const CYCLES_PER_ITERATION: u32 = 3;
 
-pub(crate) fn burn(mut cycles: u32) {
+#[inline]
+pub(crate) fn spin(mut cycles: u32) {
     cycles /= CYCLES_PER_ITERATION;
     unsafe {
         asm!(
-            "loop:",
+            "0:",
             "subs {0}, {0}, #1",
-            "bne loop",
-            in(reg) cycles
+            "bne 0b", // The 'b' suffix tells that the jump should be to the "previously defined" label "0".
+            inout(reg) cycles,
+            options(nomem, nostack)
         );
     }
+    assert_eq!(0, cycles);
 }

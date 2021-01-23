@@ -229,6 +229,7 @@ impl<
         self.counter.value()
     }
 
+    #[inline]
     fn burn_cycles(&self, cycles: u32) {
         self.counter.burn_cycles(cycles);
     }
