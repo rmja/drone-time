@@ -1,6 +1,6 @@
 //! The root task.
 
-use crate::{adapters::*, consts, thr, thr::ThrsInit, Regs};
+use crate::{consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, swo, thr::prelude::*};
 use drone_stm32_map::periph::{
@@ -59,7 +59,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     //     systick.counter,
     //     systick.overflow,
     //     thr.sys_tick,
-    //     SysTickUptimeTick,
+    //     consts::SysTickTick,
     // );
 
     let setup = GeneralTimSetup::new(
@@ -72,8 +72,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     tim2.start();
 
-    let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, Tim2Tick);
-    let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, Tim2Tick);
+    let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, consts::Tim2Tick);
+    let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, consts::Tim2Tick);
 
     assert_eq!(180_000_000, consts::SYSCLK.f());
     // 1000000 cycles should take 5555us@180MHz, measured in release build to 5.555ms-5.557ms.

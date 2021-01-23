@@ -24,11 +24,11 @@ pub trait Alarm<T: Tick> {
     fn burn_nanos(&self, mut nanos: u32) {
         debug_assert_ne!(0, T::CPU_FREQ, "The Tick::CPU_FREQ must be defined to support cycle by nanoseconds.");
 
-        while nanos > 1000 {
-            self.burn_cycles((nanos * (T::CPU_FREQ / 1000)) / 1000000);
+        while nanos > 1000000 {
+            self.burn_cycles((nanos * (T::CPU_FREQ / 1000000)) / 1000);
             nanos -= 1000;
         }
-        self.burn_cycles((nanos * (T::CPU_FREQ / 1000)) / 1000000);
+        self.burn_cycles((nanos * (T::CPU_FREQ / 1000000)) / 1000);
     }
 
     /// Get a future that completes after a delay of length `duration`.

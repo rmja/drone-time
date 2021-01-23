@@ -1,4 +1,5 @@
 use drone_stm32f4_hal::rcc::clktree::*;
+use drone_time::Tick;
 
 pub const HSECLK: HseClk = HseClk::new(8_000_000);
 pub const PLLSRC_HSECLK: PllSrcMuxSignal = PllSrcMuxSignal::Hse(HSECLK);
@@ -11,3 +12,15 @@ pub const PCLK2: PClk2 = HCLK.to_pclk2(2);
 pub const SYSTICKCLK: SysTickClk = HCLK.to_systickclk();
 
 pub const TIM2_FREQ: u32 = 1_000_000;
+
+pub struct SysTickTick;
+impl Tick for SysTickTick {
+    const FREQ: u32 = SYSCLK.f();
+    const CPU_FREQ: u32 = SYSCLK.f();
+}
+
+pub struct Tim2Tick;
+impl Tick for Tim2Tick {
+    const FREQ: u32 = TIM2_FREQ;
+    const CPU_FREQ: u32 = SYSCLK.f();
+}
