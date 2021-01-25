@@ -41,6 +41,7 @@ impl<T: Tick> TimeSpan<T> {
     const TICKS_PER_DAY: i64 = Self::TICKS_PER_HOUR * 24;
 
     /// Create a new `TimeSpan` from `hours`, `mins`, and `secs`.
+    #[inline]
     pub const fn new_time(hours: i8, mins: i8, secs: i8) -> Self {
         Self::from_parts(TimeSpanParts {
             days: 0,
@@ -68,21 +69,25 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ days.
+    #[inline]
     pub const fn from_days(days: i16) -> Self {
         Self::from_ticks(days as i64 * Self::TICKS_PER_DAY)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ hours.
+    #[inline]
     pub const fn from_hours(hours: i32) -> Self {
         Self::from_ticks(hours as i64 * Self::TICKS_PER_HOUR)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ mins.
+    #[inline]
     pub const fn from_mins(mins: i32) -> Self {
         Self::from_ticks(mins as i64 * Self::TICKS_PER_MIN)
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ seconds.
+    #[inline]
     pub const fn from_secs(secs: i32) -> Self {
         Self::from_ticks(secs as i64 * Self::TICKS_PER_SEC)
     }
@@ -106,6 +111,7 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     /// Create a new `TimeSpan` from the specified number of _whole_ ticks.
+    #[inline]
     pub const fn from_ticks(ticks: i64) -> Self {
         Self(ticks, PhantomData)
     }
@@ -139,6 +145,7 @@ impl<T: Tick> TimeSpan<T> {
     }
 
     /// Get the absolute duration of a `TimeSpan`.
+    #[inline]
     pub fn abs(&self) -> Self {
         assert!(self.0 != Self::MIN.0, "Overflow!");
         if self.0 >= 0 {

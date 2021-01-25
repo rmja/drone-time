@@ -34,7 +34,7 @@ where
         overflow: Ovf,
         timer_int: TimerInt,
         _tick: T,
-    ) -> Arc<impl Uptime<T>> {
+    ) -> Arc<Self> {
         let uptime = Arc::new(Self {
             tick: PhantomData,
             counter,
@@ -62,6 +62,24 @@ where
         uptime.overflow.overflow_int_enable();
 
         uptime
+    }
+
+    fn sample(&self) -> (u32, u32) {
+        // Two things can happen while invoking now()
+        // * Any other thread can interrupt and maybe call now()
+        // * The underlying timer runs underneath and may wrap during the invocation
+
+        loop {
+            let cnt1 = self.counter.value();
+            let overflows = self.get_overflows();
+            let cnt2 = self.counter.value();
+            if cnt1 <= cnt2 {
+                // There was no timer wrap while `overflows` was obtained.
+                break (overflows, cnt2);
+            } else {
+                // The underlying timer wrapped, retry
+            }
+        }
     }
 
     fn get_overflows(&self) -> u32 {
@@ -108,27 +126,28 @@ where
     Ovf: UptimeOverflow<A> + 'static,
     A: Send + Sync + 'static,
 {
+    #[inline]
     fn counter(&self) -> u32 {
         self.counter.value()
     }
 
+    #[inline]
     fn now(&self) -> TimeSpan<T> {
-        // Two things can happen while invoking now()
-        // * Any other thread can interrupt and maybe call now()
-        // * The underlying timer runs underneath and may wrap during the invocation
+        let (overflows, counter) = self.sample();
+        let ticks = overflows as u64 * Ovf::PERIOD + counter as u64;
+        TimeSpan::from_ticks(ticks as i64)
+    }
 
-        let now = loop {
-            let cnt1 = self.counter.value();
-            let overflows = self.get_overflows();
-            let cnt2 = self.counter.value();
-            if cnt1 <= cnt2 {
-                // There was no timer wrap while `overflows` was obtained.
-                break overflows as u64 * Ovf::PERIOD + cnt2 as u64;
-            } else {
-                // The underlying timer wrapped, retry
-            }
+    fn at(&self, counter: u32) -> TimeSpan<T> {
+        let sample = self.sample();
+        let ticks = sample.0 as u64 * Ovf::PERIOD + sample.1 as u64;
+        let now = TimeSpan::from_ticks(ticks as i64);
+        let delta = if counter <= sample.1 {
+            (sample.1 - counter) as i64
+        }
+        else {
+            sample.1 as i64 + Ovf::PERIOD as i64 - counter as i64
         };
-
-        TimeSpan::from_ticks(now as i64)
+        now - TimeSpan::from_ticks(delta)
     }
 }
