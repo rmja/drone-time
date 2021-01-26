@@ -4,15 +4,17 @@ use crate::{consts, thr, thr::ThrsInit, Regs};
 use drone_core::log;
 use drone_cortexm::{periph_sys_tick, swo, thr::prelude::*};
 use drone_stm32_map::periph::{
+    gpio::{periph_gpio_d13, periph_gpio_d_head},
     tim::periph_tim2,
-    gpio::{periph_gpio_d_head, periph_gpio_d13},
 };
 use drone_stm32f4_hal::{
+    gpio::{prelude::*, GpioHead},
     rcc::{periph_flash, periph_pwr, periph_rcc, traits::*, Flash, Pwr, Rcc, RccSetup},
     tim::{prelude::*, GeneralTimCfg, GeneralTimSetup},
-    gpio::{GpioHead, prelude::*}
 };
-use drone_time::{Alarm, AlarmDrv, DateTime, TimeSpan, Uptime, UptimeDrv, Watch, drivers::SysTickUptimeDrv};
+use drone_time::{
+    drivers::SysTickUptimeDrv, Alarm, AlarmDrv, DateTime, TimeSpan, Uptime, UptimeDrv, Watch,
+};
 use futures::prelude::*;
 
 /// The root task handler.
@@ -50,7 +52,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     println!("Hello, world!");
 
     let gpio_a = GpioHead::with_enabled_clock(periph_gpio_d_head!(reg));
-    let dbg_pin = gpio_a.pin(periph_gpio_d13!(reg))
+    let dbg_pin = gpio_a
+        .pin(periph_gpio_d13!(reg))
         .into_output()
         .into_pushpull();
 
@@ -72,7 +75,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     tim2.start();
 
-    let uptime = UptimeDrv::new(tim2.counter.clone(), tim2.overflow, thr.tim_2, consts::Tim2Tick);
+    let uptime = UptimeDrv::new(
+        tim2.counter.clone(),
+        tim2.overflow,
+        thr.tim_2,
+        consts::Tim2Tick,
+    );
     let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, consts::Tim2Tick);
 
     assert_eq!(180_000_000, consts::SYSCLK.f());
