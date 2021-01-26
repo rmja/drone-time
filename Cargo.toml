@@ -1,5 +1,3 @@
-cargo-features = ["resolver"]
-
 [package]
 name = "drone-time"
 version = "0.1.0"
