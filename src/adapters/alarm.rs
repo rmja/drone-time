@@ -8,7 +8,7 @@ pub trait AlarmCounter<T: Tick, A>: Send + Sync {
     /// Get the current counter value of the timer.
     fn value(&self) -> u32;
 
-    fn burn_cycles(&self, cycles: u32);
+    fn spin(&self, cycles: u32);
 }
 
 pub enum AlarmTimerMode {

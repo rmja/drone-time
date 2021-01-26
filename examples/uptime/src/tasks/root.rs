@@ -79,17 +79,17 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     // 1000000 cycles should take 5555us@180MHz, measured in release build to 5.555ms-5.557ms.
     for _i in 0..10 {
         dbg_pin.set();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
         dbg_pin.clear();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
         dbg_pin.set();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
         dbg_pin.clear();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
         dbg_pin.set();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
         dbg_pin.clear();
-        alarm.burn_cycles(1000000);
+        alarm.spin(1000000);
     }
 
     let mut watch = Watch::new(uptime.clone());

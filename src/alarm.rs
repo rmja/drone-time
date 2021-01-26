@@ -17,18 +17,18 @@ pub trait Alarm<T: Tick> {
     /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32;
 
-    /// Burn a number of clock cycles.
-    fn burn_cycles(&self, cycles: u32);
+    /// Spin a number of clock cycles.
+    fn spin(&self, cycles: u32);
 
-    /// Burn a number of nanoseconds.
+    /// Spin a number of nanoseconds.
     fn burn_nanos(&self, mut nanos: u32) {
         debug_assert_ne!(0, T::CPU_FREQ, "The Tick::CPU_FREQ must be defined to support cycle by nanoseconds.");
 
         while nanos > 1000000 {
-            self.burn_cycles((nanos * (T::CPU_FREQ / 1000000)) / 1000);
+            self.spin((nanos * (T::CPU_FREQ / 1000000)) / 1000);
             nanos -= 1000;
         }
-        self.burn_cycles((nanos * (T::CPU_FREQ / 1000000)) / 1000);
+        self.spin((nanos * (T::CPU_FREQ / 1000000)) / 1000);
     }
 
     /// Get a future that completes after a delay of length `duration`.
@@ -230,8 +230,8 @@ impl<
     }
 
     #[inline]
-    fn burn_cycles(&self, cycles: u32) {
-        self.counter.burn_cycles(cycles);
+    fn spin(&self, cycles: u32) {
+        self.counter.spin(cycles);
     }
 
     fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard {

@@ -1,9 +1,9 @@
 use core::{pin::Pin, task::{Context, Poll}};
 
-use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick, drivers::cortexm::spin};
+use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick};
 use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
-use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph, reg::stk}, reg::prelude::*};
+use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph, reg::stk}, reg::prelude::*, processor::spin};
 use futures::Future;
 
 use super::{diverged::SysTickDiverged, Adapter};
@@ -76,7 +76,7 @@ impl<T: Tick> AlarmCounter<T, Adapter> for SysTickCounterDrv {
     }
 
     #[inline]
-    fn burn_cycles(&self, cycles: u32) {
+    fn spin(&self, cycles: u32) {
         spin(cycles);
     }
 }
