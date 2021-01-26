@@ -23,7 +23,7 @@ pub struct UptimeDrv<T: Tick, Cnt: UptimeCounter<T, A>, Ovf: UptimeOverflow<A>, 
 
 impl<T, Cnt, Ovf, A> UptimeDrv<T, Cnt, Ovf, A>
 where
-    T: Tick + 'static,
+    T: Tick,
     Cnt: UptimeCounter<T, A> + 'static,
     Ovf: UptimeOverflow<A> + 'static,
     A: Send + Sync + 'static,
@@ -121,7 +121,7 @@ where
 
 impl<T, Cnt, Ovf, A> Uptime<T> for UptimeDrv<T, Cnt, Ovf, A>
 where
-    T: Tick + 'static,
+    T: Tick,
     Cnt: UptimeCounter<T, A> + 'static,
     Ovf: UptimeOverflow<A> + 'static,
     A: Send + Sync + 'static,

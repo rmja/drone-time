@@ -82,7 +82,7 @@ impl<T: Tick> AlarmCounter<T, Adapter> for SysTickCounterDrv {
 }
 
 #[async_trait]
-impl<Int: ThrToken, T: Tick + 'static> AlarmTimer<T, Adapter> for SysTickTimerDrv<Int> {
+impl<Int: ThrToken, T: Tick> AlarmTimer<T, Adapter> for SysTickTimerDrv<Int> {
     const MAX: u32 = 0xFFFFFF;
     const MODE: AlarmTimerMode = AlarmTimerMode::OneShotOnly;
 

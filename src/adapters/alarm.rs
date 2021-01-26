@@ -21,7 +21,7 @@ pub enum AlarmTimerMode {
 }
 
 #[async_trait]
-pub trait AlarmTimer<T: Tick + 'static, A: 'static>: Send {
+pub trait AlarmTimer<T: Tick, A: 'static>: Send {
     /// The maximum counter value.
     const MAX: u32;
 

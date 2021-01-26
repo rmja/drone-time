@@ -44,7 +44,7 @@ pub trait Alarm<T: Tick> {
 pub struct AlarmDrv<
     Cnt: AlarmCounter<T, A> + 'static,
     Tim: AlarmTimer<T, A>,
-    T: Tick + 'static,
+    T: Tick,
     A: 'static,
 > {
     counter: Cnt,
@@ -136,7 +136,7 @@ impl Drop for SubscriptionGuard {
 impl<
         Cnt: AlarmCounter<T, A> + 'static,
         Tim: AlarmTimer<T, A> + 'static,
-        T: Tick + 'static,
+        T: Tick,
         A: Send + 'static,
     > AlarmDrv<Cnt, Tim, T, A>
 {
@@ -221,7 +221,7 @@ impl<
 impl<
         Cnt: AlarmCounter<T, A> + 'static,
         Tim: AlarmTimer<T, A> + 'static,
-        T: Tick + 'static,
+        T: Tick,
         A: Send + 'static,
     > Alarm<T> for AlarmDrv<Cnt, Tim, T, A>
 {

@@ -1,4 +1,4 @@
-pub trait Tick: Send + Sync {
+pub trait Tick: Send + Sync + 'static {
     /// The timer tick frequency, i.e. the number of ticks per second.
     const FREQ: u32;
 
