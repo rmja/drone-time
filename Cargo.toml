@@ -19,6 +19,7 @@ default = []
 systick = ["drone-cortexm"]
 systick-experimental = ["drone-cortexm"]
 stm32f4 = [
+    "drone-cortexm",
     "drone-stm32-map",
     "drone-stm32f4-hal",
 ]
