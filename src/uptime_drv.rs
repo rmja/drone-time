@@ -144,8 +144,7 @@ where
         let now = TimeSpan::from_ticks(ticks as i64);
         let delta = if counter <= sample.1 {
             (sample.1 - counter) as i64
-        }
-        else {
+        } else {
             sample.1 as i64 + Ovf::PERIOD as i64 - counter as i64
         };
         now - TimeSpan::from_ticks(delta)

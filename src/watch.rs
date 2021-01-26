@@ -88,8 +88,7 @@ pub mod tests {
     impl UptimeOverflow<Adapter> for TestAlarm {
         const MAX: u32 = 0xFFFF;
 
-        fn overflow_int_enable(&self) {
-        }
+        fn overflow_int_enable(&self) {}
 
         fn is_pending_overflow(&self) -> bool {
             false

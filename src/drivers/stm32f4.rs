@@ -46,8 +46,8 @@ impl<Tim: GeneralTimMap, T: Tick> AlarmCounter<T, Adapter> for GeneralTimCntDrv<
 }
 
 #[async_trait]
-impl<Tim: GeneralTimMap, Int: IntToken, Ch: GeneralTimCh<Tim>, T: Tick>
-    AlarmTimer<T, Adapter> for GeneralTimChDrv<Tim, Int, Ch, OutputCompareMode>
+impl<Tim: GeneralTimMap, Int: IntToken, Ch: GeneralTimCh<Tim>, T: Tick> AlarmTimer<T, Adapter>
+    for GeneralTimChDrv<Tim, Int, Ch, OutputCompareMode>
 {
     const MAX: u32 = 0xFFFF;
 

@@ -1,9 +1,16 @@
-use core::{pin::Pin, task::{Context, Poll}};
+use core::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{AlarmCounter, AlarmTimer, AlarmTimerMode, Tick};
 use async_trait::async_trait;
 use drone_core::{fib, thr::prelude::*};
-use drone_cortexm::{map::{periph::sys_tick::SysTickPeriph, reg::stk}, reg::prelude::*, processor::spin};
+use drone_cortexm::{
+    map::{periph::sys_tick::SysTickPeriph, reg::stk},
+    processor::spin,
+    reg::prelude::*,
+};
 use futures::Future;
 
 use super::{diverged::SysTickDiverged, Adapter};
@@ -44,10 +51,7 @@ impl<Int: ThrToken> SysTickTimerDrv<Int> {
         self.0.stk_load.store(|r| r.write_reload(duration));
         self.0.stk_ctrl.modify(|r| r.set_tickint().set_enable());
 
-        DelayFuture {
-            stk_ctrl,
-            future,
-        }
+        DelayFuture { stk_ctrl, future }
     }
 }
 

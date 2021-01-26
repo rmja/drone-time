@@ -111,6 +111,8 @@ pub mod fakes {
         fn value(&self) -> u32 {
             self.0
         }
+
+        fn spin(&self, _cycles: u32) {}
     }
 
     #[async_trait]

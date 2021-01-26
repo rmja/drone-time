@@ -22,7 +22,11 @@ pub trait Alarm<T: Tick> {
 
     /// Spin a number of nanoseconds.
     fn burn_nanos(&self, mut nanos: u32) {
-        debug_assert_ne!(0, T::CPU_FREQ, "The Tick::CPU_FREQ must be defined to support cycle by nanoseconds.");
+        debug_assert_ne!(
+            0,
+            T::CPU_FREQ,
+            "The Tick::CPU_FREQ must be defined to support cycle by nanoseconds."
+        );
 
         while nanos > 1000000 {
             self.spin((nanos * (T::CPU_FREQ / 1000000)) / 1000);
@@ -41,12 +45,7 @@ pub trait Alarm<T: Tick> {
 }
 
 /// An alarm is backed by a single hardware timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
-pub struct AlarmDrv<
-    Cnt: AlarmCounter<T, A> + 'static,
-    Tim: AlarmTimer<T, A>,
-    T: Tick,
-    A: 'static,
-> {
+pub struct AlarmDrv<Cnt: AlarmCounter<T, A> + 'static, Tim: AlarmTimer<T, A>, T: Tick, A: 'static> {
     counter: Cnt,
     timer: Arc<RefCell<Tim>>,
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
