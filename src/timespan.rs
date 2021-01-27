@@ -163,9 +163,23 @@ impl<T: Tick> TimeSpan<T> {
     /// Get the number of _whole_ milliseconds in the `TimeSpan`.
     pub fn as_millis(&self) -> i64 {
         let secs = self.as_secs() as i64;
-        let sub_secs = self.0 - secs * Self::TICKS_PER_SEC;
+        let sub_sec_ticks = self.0 - secs * Self::TICKS_PER_SEC;
+        // Round to nearest millisecond.
+        secs * 1000 + (sub_sec_ticks * 1000 + Self::TICKS_PER_SEC / 2) / Self::TICKS_PER_SEC
+    }
+
+    /// Get the number of _whole_ microseconds in the `TimeSpan`.
+    pub fn as_micros(&self) -> i64 {
+        println!("Ticks: {}", self.0);
+        let secs = self.as_secs() as i64;
+        let sub_sec_ticks = self.0 - secs * Self::TICKS_PER_SEC;
+        // Floor milliseconds.
+        let millis = secs * 1000 + (sub_sec_ticks * 1000) / Self::TICKS_PER_SEC;
+        println!("millis: {}", millis);
+        let sub_milli_ticks = self.0 - (millis * Self::TICKS_PER_SEC) / 1000;
+        println!("sub_milli_ticks: {}", sub_milli_ticks);
         // Round to nearest.
-        secs * 1000 + (sub_secs * 1000 + Self::TICKS_PER_SEC / 2) / Self::TICKS_PER_SEC
+        millis * 1000 + (sub_milli_ticks * 1000000 + Self::TICKS_PER_SEC / 2) / Self::TICKS_PER_SEC
     }
 }
 
@@ -248,7 +262,11 @@ pub mod tests {
         let parts = ts.parts();
 
         assert_eq!(
-            1 * 86400 * 32768 + 2 * 3600 * 32768 + 3 * 60 * 32768 + 4 * 32768 + (5 * 32768) / 1000,
+            1 * 86400 * 32768 +
+            2 * 3600 * 32768 +
+            3 * 60 * 32768 +
+            4 * 32768 +
+            (5 * 32768) / 1000,
             ts.0
         );
         assert_eq!(1, parts.days);
@@ -289,8 +307,61 @@ pub mod tests {
         })
         .as_millis();
         assert_eq!(
-            1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5,
+            1 * 86400 * 1000 +
+            2 * 3600 * 1000 +
+            3 * 60 * 1000 +
+            4 * 1000 +
+            5,
             millis
+        );
+    }
+
+    #[test]
+    fn as_micros() {
+        let micros = [
+            TimeSpan::<TestTick>::from_micros(1525).as_micros(),
+
+            TimeSpan::<TestTick>::from_micros(1526).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1527).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1528).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1529).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1530).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1531).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1532).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1533).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1534).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1535).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1536).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1537).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1538).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1539).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1540).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1541).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1542).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1543).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1544).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1545).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1546).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1547).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1548).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1549).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1550).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1551).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1552).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1553).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1554).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1555).as_micros(),
+            TimeSpan::<TestTick>::from_micros(1556).as_micros(),
+
+            TimeSpan::<TestTick>::from_micros(1557).as_micros(),
+        ];
+        assert_eq!(
+            [1519,
+            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
+            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
+            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
+            1580],
+            micros
         );
     }
 
@@ -307,5 +378,8 @@ pub mod tests {
         assert_eq!(1, TimeSpan::<TestTick>::from_micros(31).0);
         assert_eq!(1, TimeSpan::<TestTick>::from_micros(61).0);
         assert_eq!(2, TimeSpan::<TestTick>::from_micros(62).0);
+
+        assert_eq!(49, TimeSpan::<TestTick>::from_micros(1525).0);
+        assert_eq!(50, TimeSpan::<TestTick>::from_micros(1526).0);
     }
 }
