@@ -21,14 +21,22 @@ pub use self::{
     adapters::alarm::{AlarmCounter, AlarmTimer, AlarmTimerMode},
     adapters::tick::Tick,
     adapters::uptime::{UptimeCounter, UptimeOverflow},
-    alarm::{Alarm, AlarmDrv},
+    alarm::AlarmDrv,
     datetime::{DateTime, Month},
     timeout::Timeout,
     timespan::TimeSpan,
-    uptime::Uptime,
     uptime_drv::UptimeDrv,
     watch::Watch,
+
+    prelude::*,
 };
+
+pub mod prelude {
+    pub use super::{
+        alarm::Alarm,
+        uptime::Uptime
+    };
+}
 
 #[prelude_import]
 #[allow(unused_imports)]
