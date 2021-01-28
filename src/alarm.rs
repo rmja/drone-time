@@ -1,5 +1,4 @@
 use core::{
-    cell::RefCell,
     future::Future,
     marker::PhantomData,
     pin::Pin,
@@ -47,7 +46,7 @@ pub trait Alarm<T: Tick> {
 /// An alarm is backed by a single hardware timer and provides infinite timeout capabilites and multiple simultaneously running timeouts.
 pub struct AlarmDrv<Cnt: AlarmCounter<T, A> + 'static, Tim: AlarmTimer<T, A>, T: Tick, A: 'static> {
     counter: Cnt,
-    timer: Arc<RefCell<Tim>>,
+    timer: Arc<Mutex<Tim>>,
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
     subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
     adapter: PhantomData<A>,
@@ -145,7 +144,7 @@ impl<
     pub fn new(counter: Cnt, timer: Tim, _tick: T) -> Self {
         Self {
             counter,
-            timer: Arc::new(RefCell::new(timer)),
+            timer: Arc::new(Mutex::new(timer)),
             running: Arc::new(AtomicOptionBox::new(None)),
             subscriptions: Arc::new(Mutex::new(VecDeque::new())),
             adapter: PhantomData,
@@ -153,13 +152,13 @@ impl<
     }
 
     async fn create_future(
-        timer: Arc<RefCell<Tim>>,
+        timer: Arc<Mutex<Tim>>,
         running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
         subscriptions: Arc<Mutex<VecDeque<Subscription<T>>>>,
         base: u32,
         duration: TimeSpan<T>,
     ) {
-        let mut t = timer.borrow_mut();
+        let mut t = timer.try_lock().expect("The timer must not be running when setting up a new timeout.");
         let timer = timer.clone();
         t.sleep(base, duration)
             .then(move |_| {

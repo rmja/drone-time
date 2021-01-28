@@ -8,6 +8,7 @@ pub trait AlarmCounter<T: Tick, A>: Send + Sync {
     /// Get the current counter value of the timer.
     fn value(&self) -> u32;
 
+    /// Spin a certain number of cpu `cycles`.
     fn spin(&self, cycles: u32);
 }
 
