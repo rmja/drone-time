@@ -56,7 +56,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let dbg_pin = gpio_a
         .pin(periph_gpio_d13!(reg))
         .into_output()
-        .into_pushpull();
+        .into_pushpull()
+        .into_nopull();
 
     // let systick = SysTickUptimeDrv::start_new(periph_sys_tick!(reg));
     // let uptime = UptimeDrv::new(
