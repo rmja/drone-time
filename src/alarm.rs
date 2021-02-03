@@ -12,7 +12,7 @@ use atomicbox::AtomicOptionBox;
 use drone_core::sync::Mutex;
 use futures::prelude::*;
 
-pub trait Alarm<T: Tick> {
+pub trait Alarm<T: Tick>: Send {
     /// Get the current counter value of the underlying hardware timer.
     fn counter(&self) -> u32;
 
@@ -162,55 +162,54 @@ impl<
         let timer = timer.clone();
         t.sleep(base, duration)
             .then(move |_| {
-                // FIXME: Use .lock() when it becomes available.
-                let mut subs = subscriptions.try_lock().unwrap();
+                let subscriptions = subscriptions.clone();
+                async move {
+                    let mut subs = subscriptions.lock().await;
+                    // Remove all subscriptions that are in the `DROPPED` state.
+                    subs.remove_dropped();
 
-                // Remove all subscriptions that are in the `DROPPED` state.
-                subs.remove_dropped();
+                    // Set the remaining time for each subscription.
+                    for s in subs.iter_mut() {
+                        s.remaining -= duration;
 
-                // Set the remaining time for each subscription.
-                for s in subs.iter_mut() {
-                    s.remaining -= duration;
-
-                    if s.remaining.0 == 0 {
-                        // Wake the future for the subscription.
-                        let old = s
-                            .state
-                            .value
-                            .swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
-                        if old == SubscriptionState::WAKEABLE {
-                            let waker = s.state.waker.take(Ordering::AcqRel).unwrap();
-                            waker.wake();
-                        } else if old == SubscriptionState::DROPPED {
-                            s.state
+                        if s.remaining.0 == 0 {
+                            // Wake the future for the subscription.
+                            let old = s
+                                .state
                                 .value
-                                .store(SubscriptionState::DROPPED, Ordering::Release);
+                                .swap(SubscriptionState::COMPLETED, Ordering::AcqRel);
+                            if old == SubscriptionState::WAKEABLE {
+                                let waker = s.state.waker.take(Ordering::AcqRel).unwrap();
+                                waker.wake();
+                            } else if old == SubscriptionState::DROPPED {
+                                s.state
+                                    .value
+                                    .store(SubscriptionState::DROPPED, Ordering::Release);
+                            }
                         }
                     }
+
+                    // Remove all subscriptions that have remaining == 0.
+                    subs.retain(|x| x.remaining.0 > 0);
+
+                    if let Some(next) = subs.front() {
+                        // Create a future for the next subscription in line.
+
+                        let base = Tim::counter_add(base, (duration.0 as u64 % Tim::PERIOD) as u32);
+                        let duration = next.remaining;
+
+                        let future = Self::create_future(
+                            timer,
+                            running.clone(),
+                            subscriptions.clone(),
+                            base,
+                            duration,
+                        );
+                        running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
+                    } else {
+                        running.take(Ordering::AcqRel);
+                    }
                 }
-
-                // Remove all subscriptions that have remaining == 0.
-                subs.retain(|x| x.remaining.0 > 0);
-
-                if let Some(next) = subs.front() {
-                    // Create a future for the next subscription in line.
-
-                    let base = Tim::counter_add(base, (duration.0 as u64 % Tim::PERIOD) as u32);
-                    let duration = next.remaining;
-
-                    let future = Self::create_future(
-                        timer,
-                        running.clone(),
-                        subscriptions.clone(),
-                        base,
-                        duration,
-                    );
-                    running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
-                } else {
-                    running.take(Ordering::AcqRel);
-                }
-
-                future::ready(())
             })
             .await;
     }

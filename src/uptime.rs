@@ -1,6 +1,6 @@
 use crate::{Tick, TimeSpan};
 
-pub trait Uptime<T: Tick>: Sync {
+pub trait Uptime<T: Tick>: Send + Sync {
     /// Sample the counter of the underlying timer.
     fn counter(&self) -> u32;
 
