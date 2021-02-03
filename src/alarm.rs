@@ -2,7 +2,7 @@ use core::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU8, Ordering},
     task::{Context, Poll, Waker},
 };
 
@@ -62,28 +62,42 @@ pub struct Subscription<T: Tick> {
 /// The state related to a subscription.
 /// It is basically an enum where `waker` is only defined if state is `WAKEABLE`.
 struct SubscriptionState {
-    /// The subscription state (ADDED, WAKEABLE, COMPLETED, DROPPED).
-    value: AtomicUsize,
+    /// The subscription state (PENDING, ADDED, WAKEABLE, COMPLETED, DROPPED).
+    value: AtomicU8,
     /// The waker to be invoked when the future should complete.
     waker: AtomicOptionBox<Waker>,
 }
 
 pub struct SubscriptionGuard {
+    appender: AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>,
     running: Arc<AtomicOptionBox<Pin<Box<dyn Future<Output = ()>>>>>,
     state: Arc<SubscriptionState>,
 }
 
 impl SubscriptionState {
-    const ADDED: usize = 0;
-    const WAKEABLE: usize = 1;
-    const COMPLETED: usize = 2;
-    const DROPPED: usize = 3;
+    const PENDING_ADD: u8 = 0;
+    const ADDED: u8 = 1;
+    const WAKEABLE: u8 = 2;
+    const COMPLETED: u8 = 3;
+    const DROPPED: u8 = 4;
 }
 
 impl Future for SubscriptionGuard {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let state = self.state.clone();
+
+        if state.value.compare_and_swap(SubscriptionState::PENDING_ADD, SubscriptionState::ADDED, Ordering::AcqRel) == SubscriptionState::PENDING_ADD {
+            let mut appender = self.appender.take(Ordering::AcqRel).unwrap();
+
+            if appender.poll_unpin(cx).is_pending() {
+                self.appender.store(Some(appender), Ordering::AcqRel);
+                state.value.store(SubscriptionState::PENDING_ADD, Ordering::Release);
+                return Poll::Pending;
+            }
+        }
+
         // Always poll the underlying timer sleep future - it won't start otherwise.
         let running = self.running.clone();
         if let Some(mut future) = running.take(Ordering::AcqRel) {
@@ -94,14 +108,13 @@ impl Future for SubscriptionGuard {
             }
         }
 
-        let shared = self.state.clone();
         let waker = cx.waker().clone();
 
         // Copy the waker to the subscription so that we can wake it when it is time.
-        shared.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
+        state.waker.store(Some(Box::new(waker)), Ordering::AcqRel);
 
         // We can now update the state to WAKEABLE now when the waker is reliably stored for the subscription.
-        let old = shared
+        let old = state
             .value
             .swap(SubscriptionState::WAKEABLE, Ordering::AcqRel);
         assert!(old != SubscriptionState::DROPPED);
@@ -109,12 +122,12 @@ impl Future for SubscriptionGuard {
             // Timeout has already occured.
 
             // Set the state back to COMPLETED.
-            shared
+            state
                 .value
                 .store(SubscriptionState::COMPLETED, Ordering::Release);
 
             // Remove the waker that we just assigned - it turns out that it was not needed as we are about to return `Ready`.
-            shared.waker.take(Ordering::AcqRel);
+            state.waker.take(Ordering::AcqRel);
 
             Poll::Ready(())
         } else {
@@ -233,40 +246,46 @@ impl<
 
     fn sleep_from(&self, base: u32, duration: TimeSpan<T>) -> SubscriptionGuard {
         let sub_state = Arc::new(SubscriptionState {
-            value: AtomicUsize::new(SubscriptionState::ADDED),
+            value: AtomicU8::new(SubscriptionState::PENDING_ADD),
             waker: AtomicOptionBox::new(None),
         });
+
         let sub = Subscription {
             remaining: duration,
             state: sub_state.clone(),
         };
 
-        // FIXME: Use .lock() when it becomes available.
-        let mut subs = self.subscriptions.try_lock().unwrap();
-
-        // Remove all subscriptions that are in the `DROPPED` state.
-        subs.remove_dropped();
-
-        // Find the position where the new subscription should be added and insert.
-        let index = subs.get_insert_index(duration);
-        subs.insert(index, sub);
-
-        if index == 0 {
-            // It turns out that this subscription is the next in line.
-
-            let future = Self::create_future(
-                self.timer.clone(),
-                self.running.clone(),
-                self.subscriptions.clone(),
-                base,
-                duration,
-            );
-
-            let running = self.running.clone();
-            running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
-        }
+        let timer = self.timer.clone();
+        let running = self.running.clone();
+        let subscriptions = self.subscriptions.clone();
+        let appender = async move {
+            let mut subs = subscriptions.lock().await;
+    
+            // Remove all subscriptions that are in the `DROPPED` state.
+            subs.remove_dropped();
+    
+            // Find the position where the new subscription should be added and insert.
+            let index = subs.get_insert_index(duration);
+            subs.insert(index, sub);
+    
+            if index == 0 {
+                // It turns out that this subscription is the next in line.
+    
+                let future = Self::create_future(
+                    timer.clone(),
+                    running.clone(),
+                    subscriptions.clone(),
+                    base,
+                    duration,
+                );
+    
+                let running = running.clone();
+                running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
+            }
+        };
 
         SubscriptionGuard {
+            appender: AtomicOptionBox::new(Some(Box::new(appender.boxed_local()))),
             running: self.running.clone(),
             state: sub_state,
         }
@@ -315,17 +334,17 @@ pub mod tests {
         let alarm = AlarmDrv::new(counter, timer, FakeTick);
 
         let fires = Mutex::new(Vec::new());
-        let t1 = alarm.sleep(TimeSpan::from_ticks(2)).then(|_| {
-            fires.try_lock().unwrap().push(2);
-            future::ready(())
+        let t1 = alarm.sleep(TimeSpan::from_ticks(2)).then(|_| async {
+            let mut fires = fires.lock().await;
+            fires.push(2);
         });
-        let t2 = alarm.sleep(TimeSpan::from_ticks(1)).then(|_| {
-            fires.try_lock().unwrap().push(1);
-            future::ready(())
+        let t2 = alarm.sleep(TimeSpan::from_ticks(1)).then(|_| async {
+            let mut fires = fires.lock().await;
+            fires.push(1);
         });
-        let t3 = alarm.sleep(TimeSpan::from_ticks(3)).then(|_| {
-            fires.try_lock().unwrap().push(3);
-            future::ready(())
+        let t3 = alarm.sleep(TimeSpan::from_ticks(3)).then(|_| async {
+            let mut fires = fires.lock().await;
+            fires.push(3);
         });
 
         future::join3(t1, t2, t3).await;
