@@ -17,20 +17,18 @@ pub struct SysTickCounterDrv(Arc<SysTickDiverged>);
 pub struct SysTickOverflowDrv(Arc<SysTickDiverged>, AtomicBool);
 
 impl SysTickUptimeDrv {
-    pub fn new(systick: SysTickPeriph) -> Self {
+    pub fn start_new(systick: SysTickPeriph) -> Self {
         // Configure reload value.
         systick.stk_load.store(|r| r.write_reload(0xFFFFFF));
+
+        // Start the counter in a multi-shot way
+        systick.stk_ctrl.store(|r| r.set_enable());
 
         let systick = Arc::new(SysTickDiverged::new(systick));
         Self {
             counter: SysTickCounterDrv(systick.clone()),
             overflow: SysTickOverflowDrv(systick, AtomicBool::new(false)),
         }
-    }
-
-    /// Start the counter in a multi-shot way
-    pub fn start(&mut self) {
-        self.counter.0.stk_ctrl.store(|r| r.set_enable());
     }
 }
 
@@ -60,7 +58,9 @@ impl UptimeOverflow<Adapter> for SysTickOverflowDrv {
             let is_pending = self.0.stk_ctrl.countflag.read_bit();
 
             // Store the flag in case that is_pending_overflow() is called multiple times for the overflow.
-            self.1.compare_and_swap(false, is_pending, Ordering::AcqRel) || is_pending
+            self.1
+                .compare_exchange(false, is_pending, Ordering::AcqRel, Ordering::Acquire).is_err()
+                || is_pending
         })
     }
 

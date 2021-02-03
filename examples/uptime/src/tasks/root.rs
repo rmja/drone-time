@@ -58,7 +58,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         .into_output()
         .into_pushpull();
 
-    // let systick = SysTickUptimeDrv::new(periph_sys_tick!(reg));
+    // let systick = SysTickUptimeDrv::start_new(periph_sys_tick!(reg));
     // let uptime = UptimeDrv::new(
     //     systick.counter,
     //     systick.overflow,
@@ -73,9 +73,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         TimFreq::Nominal(consts::TIM2_FREQ),
     );
     let tim2 = GeneralTimCfg::with_enabled_clock(setup).ch1(|ch| ch.into_output_compare());
-
     tim2.start();
-
     let uptime = UptimeDrv::new(
         tim2.counter.clone(),
         tim2.overflow,

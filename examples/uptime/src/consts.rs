@@ -15,7 +15,7 @@ pub const TIM2_FREQ: u32 = 1_000_000;
 
 pub struct SysTickTick;
 impl Tick for SysTickTick {
-    const FREQ: u32 = SYSCLK.f();
+    const FREQ: u32 = SYSTICKCLK.f();
     const CPU_FREQ: u32 = SYSCLK.f();
 }
 

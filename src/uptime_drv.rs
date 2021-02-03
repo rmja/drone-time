@@ -103,7 +103,7 @@ where
         if level == 0
             && self
                 .overflows_next_pending
-                .compare_and_swap(true, false, Ordering::AcqRel)
+                .compare_exchange(true, false, Ordering::AcqRel, Ordering::Relaxed).is_ok()
         {
             // We are the outer-most thread (lowest priority) that have called now() and seen the overflow flag.
             // The flag is now cleared, and so there is a-lot of time until the pending flag is seen again,

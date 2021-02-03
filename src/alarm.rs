@@ -88,12 +88,20 @@ impl Future for SubscriptionGuard {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let state = self.state.clone();
 
-        if state.value.compare_and_swap(SubscriptionState::PENDING_ADD, SubscriptionState::ADDED, Ordering::AcqRel) == SubscriptionState::PENDING_ADD {
+        if state.value.compare_exchange(
+            SubscriptionState::PENDING_ADD,
+            SubscriptionState::ADDED,
+            Ordering::AcqRel,
+            Ordering::Relaxed,
+        ).is_ok()
+        {
             let mut appender = self.appender.take(Ordering::AcqRel).unwrap();
 
             if appender.poll_unpin(cx).is_pending() {
                 self.appender.store(Some(appender), Ordering::AcqRel);
-                state.value.store(SubscriptionState::PENDING_ADD, Ordering::Release);
+                state
+                    .value
+                    .store(SubscriptionState::PENDING_ADD, Ordering::Release);
                 return Poll::Pending;
             }
         }
@@ -171,7 +179,9 @@ impl<
         base: u32,
         duration: TimeSpan<T>,
     ) {
-        let mut t = timer.try_lock().expect("The timer must not be running when setting up a new timeout.");
+        let mut t = timer
+            .try_lock()
+            .expect("The timer must not be running when setting up a new timeout.");
         let timer = timer.clone();
         t.sleep(base, duration)
             .then(move |_| {
@@ -260,17 +270,17 @@ impl<
         let subscriptions = self.subscriptions.clone();
         let appender = async move {
             let mut subs = subscriptions.lock().await;
-    
+
             // Remove all subscriptions that are in the `DROPPED` state.
             subs.remove_dropped();
-    
+
             // Find the position where the new subscription should be added and insert.
             let index = subs.get_insert_index(duration);
             subs.insert(index, sub);
-    
+
             if index == 0 {
                 // It turns out that this subscription is the next in line.
-    
+
                 let future = Self::create_future(
                     timer.clone(),
                     running.clone(),
@@ -278,7 +288,7 @@ impl<
                     base,
                     duration,
                 );
-    
+
                 let running = running.clone();
                 running.store(Some(Box::new(future.boxed_local())), Ordering::AcqRel);
             }

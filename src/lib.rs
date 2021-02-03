@@ -22,19 +22,18 @@ pub use self::{
     adapters::tick::Tick,
     adapters::uptime::{UptimeCounter, UptimeOverflow},
     alarm::AlarmDrv,
+    prelude::*,
     timeout::Timeout,
     uptime_drv::UptimeDrv,
     watch::Watch,
-
-    prelude::*,
 };
 
 pub mod prelude {
     pub use super::{
         alarm::Alarm,
-        uptime::Uptime,
-        timespan::TimeSpan,
         datetime::{DateTime, Month},
+        timespan::TimeSpan,
+        uptime::Uptime,
     };
 }
 

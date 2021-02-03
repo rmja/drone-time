@@ -262,11 +262,7 @@ pub mod tests {
         let parts = ts.parts();
 
         assert_eq!(
-            1 * 86400 * 32768 +
-            2 * 3600 * 32768 +
-            3 * 60 * 32768 +
-            4 * 32768 +
-            (5 * 32768) / 1000,
+            1 * 86400 * 32768 + 2 * 3600 * 32768 + 3 * 60 * 32768 + 4 * 32768 + (5 * 32768) / 1000,
             ts.0
         );
         assert_eq!(1, parts.days);
@@ -307,11 +303,7 @@ pub mod tests {
         })
         .as_millis();
         assert_eq!(
-            1 * 86400 * 1000 +
-            2 * 3600 * 1000 +
-            3 * 60 * 1000 +
-            4 * 1000 +
-            5,
+            1 * 86400 * 1000 + 2 * 3600 * 1000 + 3 * 60 * 1000 + 4 * 1000 + 5,
             millis
         );
     }
@@ -320,7 +312,6 @@ pub mod tests {
     fn as_micros() {
         let micros = [
             TimeSpan::<TestTick>::from_micros(1525).as_micros(),
-
             TimeSpan::<TestTick>::from_micros(1526).as_micros(),
             TimeSpan::<TestTick>::from_micros(1527).as_micros(),
             TimeSpan::<TestTick>::from_micros(1528).as_micros(),
@@ -352,15 +343,14 @@ pub mod tests {
             TimeSpan::<TestTick>::from_micros(1554).as_micros(),
             TimeSpan::<TestTick>::from_micros(1555).as_micros(),
             TimeSpan::<TestTick>::from_micros(1556).as_micros(),
-
             TimeSpan::<TestTick>::from_micros(1557).as_micros(),
         ];
         assert_eq!(
-            [1519,
-            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
-            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
-            1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
-            1580],
+            [
+                1519, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
+                1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549, 1549,
+                1549, 1549, 1549, 1549, 1580
+            ],
             micros
         );
     }
