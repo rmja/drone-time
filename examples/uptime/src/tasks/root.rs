@@ -29,7 +29,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     // Enable interrupts.
     thr.rcc.enable_int();
-    thr.tim_2.enable_int();
+    thr.tim2.enable_int();
 
     // Initialize clocks.
     let rcc = Rcc::init(RccSetup::new(periph_rcc!(reg), thr.rcc));
@@ -68,7 +68,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let setup = GeneralTimSetup::new(
         periph_tim2!(reg),
-        thr.tim_2,
+        thr.tim2,
         pclk1,
         TimFreq::Nominal(consts::TIM2_FREQ),
     );
@@ -77,13 +77,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let uptime = UptimeDrv::new(
         tim2.counter.clone(),
         tim2.overflow,
-        thr.tim_2,
+        thr.tim2,
         consts::Tim2Tick,
     );
     let alarm = AlarmDrv::new(tim2.counter, tim2.ch1, consts::Tim2Tick);
 
     assert_eq!(180_000_000, consts::SYSCLK.f());
-    // 1000000 cycles should take 5555us@180MHz, measured in release build to 5.555ms-5.557ms.
+    // 1000000 cycles should take 5555us@180MHz, measured in release build to be between 5.555ms and 5.557ms.
     for _i in 0..10 {
         dbg_pin.set();
         alarm.spin(1000000);

@@ -50,7 +50,7 @@ impl<U: Uptime<T>, T: Tick> Watch<U, T> {
 pub mod tests {
     use drone_core::{
         fib,
-        thr::{PreemptedCell, ThrToken, Thread, ThreadLocal},
+        thr,
         token::Token,
     };
 
@@ -61,18 +61,6 @@ pub mod tests {
     struct Adapter;
 
     struct TestAlarm;
-
-    #[derive(Clone, Copy)]
-    struct TestToken;
-    struct TestThreadLocal;
-    struct TestThread {
-        fibers: fib::Chain,
-        local: TestThreadLocal,
-    }
-    const TEST_THREAD: TestThread = TestThread {
-        fibers: fib::Chain::new(),
-        local: TestThreadLocal,
-    };
 
     struct TestTick;
     impl Tick for TestTick {
@@ -99,45 +87,18 @@ pub mod tests {
         }
     }
 
-    unsafe impl Token for TestToken {
-        unsafe fn take() -> Self {
-            todo!()
-        }
-    }
-
-    unsafe impl ThrToken for TestToken {
-        type Thr = TestThread;
-
-        const THR_IDX: usize = 0;
-    }
-
-    impl Thread for TestThread {
-        type Local = TestThreadLocal;
-
-        fn first() -> *const Self {
-            &TEST_THREAD
-        }
-
-        fn fib_chain(&self) -> &fib::Chain {
-            &self.fibers
-        }
-
-        unsafe fn local(&self) -> &Self::Local {
-            &self.local
-        }
-    }
-
-    impl ThreadLocal for TestThreadLocal {
-        fn preempted(&self) -> &PreemptedCell {
-            todo!()
-        }
+    thr::pool! {
+        thread => Thr {};
+        local => ThrLocal {};
+        index => Thrs;
+        threads => { thr0 };
     }
 
     #[test]
     fn set() {
         let counter = TestAlarm;
         let overflow = TestAlarm;
-        let thread = TestToken;
+        let thread = unsafe { Thr0::take() };
         let uptime = UptimeDrv::new(counter, overflow, thread, TestTick);
         let mut watch = Watch::new(uptime);
 

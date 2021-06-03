@@ -3,8 +3,6 @@ features := 'systick stm32f4'
 # Install dependencies
 deps:
 	type drone >/dev/null || cargo install drone
-	rustup component add clippy
-	rustup component add rustfmt
 
 # Reformat the source code
 fmt:
