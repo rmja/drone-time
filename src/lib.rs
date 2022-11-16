@@ -1,6 +1,5 @@
 #![feature(asm)]
-#![feature(const_fn)]
-#![feature(const_panic)]
+#![feature(const_fn_trait_bound)]
 #![feature(never_type)]
 #![feature(prelude_import)]
 #![cfg_attr(not(feature = "std"), no_std)]
